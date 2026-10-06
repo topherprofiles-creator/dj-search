@@ -8,7 +8,7 @@ One run: find what's trending right now, skip what you already own (PC **and** G
 
 Type `/dj-search` in Claude Code and the skill:
 
-1. **Asks** for the trending window (7 / 14 / 30 days) and your save path — genre and track count get sensible defaults you can override.
+1. **Stops and asks first** — save path, window (7 / 14 / 30 days), and genre (or *general*) — nothing runs until you answer; count and clean/dirty ride along with sensible defaults.
 2. **Discovers** what's moving — reads TurnTable Charts, Apple Music NG, Spotify NG + Viral, Audiomack, Boomplay, Shazam NG and TikTok trending sounds in your live Chrome, intersects the charts, and keeps only entries moving inside your window.
 3. **Scans your PC** — `scripts/scan_library.py` walks your **entire PC and every plugged-in flash/removable drive** (`--all-drives`; system folders are pruned automatically), reads ID3v2/ID3v1, MP4/M4A atoms and FLAC tags offline (zero dependencies), and fuzzy-matches every candidate against what's there.
 4. **Checks Google Drive** — mounted Drive letter, an `rclone` listing, or a browser search — so you never re-download what's already in the cloud.

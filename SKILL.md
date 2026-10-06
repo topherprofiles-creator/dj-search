@@ -31,15 +31,22 @@ streaming-only track, decline that track and offer the legal alternative; keep d
 
 ## The run, in order
 
-### 1. Ask two things (the skill always asks before digging)
+### 1. STOP — ask first (strict rule, no exceptions)
 
-- **Window** — trending over the last **7**, **14**, or **30** days? (default 7)
-- **Save path** — where do the MP3s and the crate file go? (e.g. `D:\DJ\Crates\2026-10`)
+**Do nothing else until the DJ has answered: no chart reading, no browsing, no scanning, no
+downloads — not even opening a page.** Ask these directly in the chat as plain numbered questions
+and wait for the reply:
 
-Then confirm two more with sensible defaults, in one line, and move on unless they correct you:
+- **Where to save** — the save path for the MP3s and the crate file. You may offer a suggestion (the
+  DJ's kit drive if one is known, otherwise `~/Music/dj-search/<date>`), but never assume it.
+- **How many days** — trending over the last **7**, **14**, or **30** days?
+- **Which genre** — the usual *Afrobeats + Amapiano + Nigerian trending + Gen-Z*, or **general**
+  (whatever is charting overall), or any genre/taste the DJ names.
 
-- **Genre/vibe** — default: *Afrobeats + Amapiano + Nigerian trending + Gen-Z TikTok*. Accept anything.
-- **Count** — default: top **25** candidates. **Clean or dirty** — default: **clean** (radio edit) where it exists.
+In the same ask, cover the finishing options (these may keep defaults if the DJ doesn't care):
+top **25** candidates, and **clean** (radio edit) where it exists, else the explicit edit.
+
+Only when the answers are in hand does step 2 begin.
 
 ### 2. Discover what's trending (browser + web search — discovery only)
 
