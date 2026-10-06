@@ -89,7 +89,9 @@ For each missing track, resolve a download URL and fetch it, in this order:
    length check is what rejects wrong edits of the right song. Matches are labeled
    `download_source: "youtube:<channel>"` in the manifest, `match_confidence` is recorded, and the
    downloader prints `(YouTube fallback)` for each so the report stays honest about where files came
-   from. Tracks a previous run parked as `buy_only` are automatically reconsidered.
+   from. Tracks a previous run parked as `buy_only` are automatically reconsidered. For big runs,
+   re-run the resolver once on the no-match lines before the browser step — transient search
+   hiccups under load are common, and a fresh pass recovers a chunk (live: 55 of 72).
 3. **Browser lookup (agent step — only for the resolver's no-match lines)** — when the resolver
    prints `NO ARTIST-ENABLED FREE SOURCE AND NO YOUTUBE MATCH`, do what a human would: search it
    yourself in the DJ's already-open Chrome (chrome-devtools `--autoConnect` — never close, kill,
