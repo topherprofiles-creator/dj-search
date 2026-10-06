@@ -58,7 +58,7 @@ Resolve each missing track to the first of these that has it. Stop at the first 
   proper clean/dirty/intro edits — best quality for actual sets.
 
 ### The downloader script
-`scripts/download.py` wraps `yt-dlp` and is for the sources above that **offer** a free download
+`scripts/download.py` drives the `yt-dlp` library (in-process) and is for the sources above that **offer** a free download
 (SoundCloud free links, Bandcamp, Audiomack downloadable tracks). It extracts best audio and
 transcodes to MP3 320. It must **not** be pointed at YouTube/Spotify/Apple/Boomplay or any
 stream-only URL — that is the line in SKILL.md.

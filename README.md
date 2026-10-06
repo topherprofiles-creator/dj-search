@@ -35,7 +35,7 @@ It will **never** rip YouTube, Spotify, Apple Music or Boomplay, and never touch
 | [Claude Code](https://claude.com/claude-code) | hosts the skill |
 | Python 3.9+ | scripts are stdlib-only — no pip installs |
 | A browser automation MCP (chrome-devtools recommended) | chart reading + downloads |
-| `yt-dlp` *(optional)* | `python -m pip install -U yt-dlp` — automated downloads |
+| `yt-dlp` *(optional)* | `python -m pip install -U yt-dlp` — automated downloads (used as an in-process library) |
 | `ffmpeg` *(optional)* | MP3 320 transcode for downloaded files |
 | `rclone` *(optional)* | offline Google Drive de-dup |
 
@@ -72,7 +72,7 @@ dj-search/
 ├─ SKILL.md                     the skill itself (Claude Code entry point)
 ├─ scripts/
 │  ├─ scan_library.py           offline tag reader + fuzzy de-dup (zero deps)
-│  ├─ download.py               legal-source downloader (yt-dlp wrapper, allowlisted)
+│  ├─ download.py               legal-source downloader (yt-dlp library, allowlisted)
 │  └─ write_crate.py            ranked CSV + M3U8 writer
 ├─ references/
 │  └─ sources.md                how to read each chart; per-source download recipes
@@ -104,7 +104,7 @@ Builds a synthetic library (fake ID3 tags, a filename-only file, a Drive-only tr
 
 ## Troubleshooting
 
-- **`yt-dlp` not found** — `python -m pip install -U yt-dlp` (or `pipx install yt-dlp`).
+- **`yt-dlp` not installed** — `python -m pip install -U yt-dlp`; it must be importable by the same Python that runs the script (a pipx/CLI-only install won't work).
 - **ffmpeg missing / no MP3 out** — install ffmpeg and make sure it's on PATH.
 - **SoundCloud/Audiomack ask for a login** — the skill pauses and asks *you* to log in; it never enters credentials. For yt-dlp you can pass `--browser chrome` (close Chrome first — its cookie database is locked while running).
 - **Drive letter missing** — Google Drive for Desktop may mount under a different letter; check `Get-PSDrive` (Windows) or the Finder sidebar (macOS), or use the rclone route.

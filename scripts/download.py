@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""download.py - legal free-download fetcher for dj-search (yt-dlp wrapper).
+"""download.py - legal free-download fetcher for dj-search (yt-dlp library).
 
 Only for sources that actually offer the track for free or under the DJ's own
 license: Audiomack (artist enabled), SoundCloud (Free Download enabled),
@@ -7,8 +7,11 @@ Bandcamp (free / name-your-price). Every other host is refused - YouTube,
 Spotify, Apple Music, Boomplay and piracy sites are discovery-only (see the
 legal line in SKILL.md). The allowlist below is enforced per URL.
 
-Requirements: yt-dlp (`python -m pip install -U yt-dlp`); ffmpeg on PATH for
-the MP3 320 transcode.
+Runs yt-dlp in-process via the `yt_dlp` Python package (no CLI subprocess), so
+interactive runs show a live download percentage on stderr.
+
+Requirements: yt-dlp installed for this interpreter
+(`python -m pip install -U yt-dlp`); ffmpeg on PATH for the MP3 320 transcode.
 
 Manifest mode (SKILL.md step 5) - downloads every candidate that is still
 missing and has a download_url, updating the manifest in place:
@@ -30,10 +33,14 @@ import glob as globmod
 import json
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import urlparse
+
+try:
+    from yt_dlp import YoutubeDL
+except ImportError:  # reported as an install hint in main()
+    YoutubeDL = None
 
 ALLOWED_HOSTS = ("audiomack.com", "soundcloud.com", "bandcamp.com")
 
@@ -75,35 +82,70 @@ def print_skipped(skipped: dict) -> None:
             print(f"  {reason}: {len(items)} — {names}")
 
 
-def find_ytdlp():
-    exe = shutil.which("yt-dlp")
-    if exe:
-        return [exe]
-    try:
-        subprocess.run([sys.executable, "-m", "yt_dlp", "--version"],
-                       check=True, capture_output=True)
-        return [sys.executable, "-m", "yt_dlp"]
-    except Exception:
-        return None
+def progress_hook(status: dict) -> None:
+    """Live percent on stderr - only when interactive, so redirected logs stay clean."""
+    if not sys.stderr.isatty():
+        return
+    if status.get("status") == "downloading":
+        total = status.get("total_bytes") or status.get("total_bytes_estimate") or 0
+        got = status.get("downloaded_bytes") or 0
+        if total:
+            sys.stderr.write(f"\r    {got * 100 // total:3d}%")
+        else:
+            sys.stderr.write(f"\r    {got // 1024} KiB")
+    elif status.get("status") == "finished":
+        sys.stderr.write("\r" + " " * 16 + "\r")
 
 
-def download_one(url, outdir: Path, base: str, quality: str, browser, ytdlp):
-    cmd = ytdlp + ["-x", "--audio-format", "mp3", "--audio-quality", quality,
-                   "--no-playlist", "--no-overwrites", "--newline",
-                   "-o", str(outdir / (base + ".%(ext)s")), url]
+def browser_tuple(spec: str):
+    """yt-dlp's BROWSER[:PROFILE] syntax -> the library's cookiesfrombrowser tuple."""
+    browser, _, profile = spec.partition(":")
+    return (browser.strip(), profile.strip() or None)
+
+
+def normalize_quality(spec: str) -> str:
+    """Mirror the CLI's --audio-quality normalization: it strips a trailing K
+    ('320K' -> '320') before float_or_none() turns the value into `-b:a 320k`.
+    Without this the postprocessor sees float('320K') = None and ffmpeg falls
+    back to its 128k default."""
+    return (spec or "").strip().strip("k").strip("K")
+
+
+def download_one(url, outdir: Path, base: str, quality: str, browser):
+    opts = {
+        "format": "bestaudio/best",
+        "outtmpl": str(outdir / (base + ".%(ext)s")),
+        "noplaylist": True,
+        "overwrites": False,
+        "quiet": True,
+        "no_warnings": True,
+        "noprogress": True,
+        "progress_hooks": [progress_hook],
+        "postprocessors": [{
+            "key": "FFmpegExtractAudio",
+            "preferredcodec": "mp3",
+            "preferredquality": normalize_quality(quality),
+        }],
+    }
     if browser:
-        cmd += ["--cookies-from-browser", browser]
-    proc = subprocess.run(cmd, capture_output=True, text=True,
-                          encoding="utf-8", errors="replace")
+        opts["cookiesfrombrowser"] = browser_tuple(browser)
+
+    failure = None
+    try:
+        with YoutubeDL(opts) as ydl:
+            ydl.download([url])
+    except Exception as exc:  # DownloadError for almost everything - the on-disk
+        failure = str(exc)   # check below decides, same as the old CLI version.
+
     produced = outdir / (base + ".mp3")
-    if proc.returncode == 0 and produced.exists():
+    if produced.exists():
         return True, produced
     leftovers = [p for p in globmod.glob(str(outdir / (globmod.escape(base) + ".*")))
                  if not p.lower().endswith(".mp3")]
     if leftovers:
         return False, f"postprocessing failed (is ffmpeg on PATH?) - leftover {Path(leftovers[0]).name}"
-    err = (proc.stderr or proc.stdout or "").strip().splitlines()
-    return False, (err[-1][:200] if err else f"yt-dlp exited {proc.returncode}")
+    err = (failure or "").strip().splitlines()
+    return False, (err[-1][:200] if err else "download failed (no file produced)")
 
 
 def main(argv=None) -> int:
@@ -114,8 +156,9 @@ def main(argv=None) -> int:
     ap.add_argument("--have", help="have_pc.json - owned candidates are skipped")
     ap.add_argument("--outdir", required=True, help="where MP3s are written (the save path)")
     ap.add_argument("--name", help="single-URL mode: file name, e.g. 'Artist - Title (Clean)'")
-    ap.add_argument("--quality", default="320K", help="MP3 quality for yt-dlp (default 320K)")
-    ap.add_argument("--browser", help="pass --cookies-from-browser, e.g. chrome (close Chrome first)")
+    ap.add_argument("--quality", default="320K", help="MP3 bitrate for the transcode (default 320K)")
+    ap.add_argument("--browser", help="load cookies from this browser, e.g. chrome or "
+                                      "'chrome:Profile 2' (close Chrome first)")
     ap.add_argument("--confirm-free-download", action="store_true",
                     help="confirm each source offers a free/licensed download (SKILL.md step 5)")
     ap.add_argument("--dry-run", action="store_true")
@@ -133,9 +176,9 @@ def main(argv=None) -> int:
     outdir.mkdir(parents=True, exist_ok=True)
 
     if not args.dry_run:
-        ytdlp = find_ytdlp()
-        if ytdlp is None:
-            raise SystemExit("yt-dlp not found. Install it:  python -m pip install -U yt-dlp")
+        if YoutubeDL is None:
+            raise SystemExit("yt-dlp is not installed for this Python. Install it:\n"
+                             "  python -m pip install -U yt-dlp")
         if shutil.which("ffmpeg") is None:
             raise SystemExit("ffmpeg not found on PATH - needed for the MP3 320 transcode.")
 
@@ -203,7 +246,7 @@ def main(argv=None) -> int:
             continue
         base = unique_base(outdir, sanitize(name))
         print(f"Downloading  {label}  <- {url}")
-        ok, result = download_one(url, outdir, base, args.quality, args.browser, ytdlp)
+        ok, result = download_one(url, outdir, base, args.quality, args.browser)
         if ok:
             ok_count += 1
             downloaded.append((label, str(result)))

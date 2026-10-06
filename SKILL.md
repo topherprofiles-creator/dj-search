@@ -126,7 +126,7 @@ more. Summary:
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
 - Audiomack/SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it.
   Files land in the browser's Downloads folder; the skill then moves+renames them.
-- `scripts/download.py` wraps `yt-dlp` for sources that *offer* a free download (SoundCloud/Bandcamp
+- `scripts/download.py` drives the `yt-dlp` library in-process for sources that *offer* a free download (SoundCloud/Bandcamp
   free links, Audiomack). It is **not** for streaming/paywalled rips — see the legal line. Run it as
   `python scripts/download.py --manifest "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json" --outdir "<save_path>" --confirm-free-download`
   (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
