@@ -15,7 +15,7 @@ real trend, not one platform's quirk.
 | TurnTable Charts | `turntablecharts.com` | Nigeria's official chart (Top 100, Top Streaming). Note movement arrows for rising/new. |
 | Apple Music NG | `music.apple.com/ng/charts` | Top 100 Songs / Daily Top 100: Nigeria. Dates on new entries. |
 | Spotify NG | `open.spotify.com` → Top 50 Nigeria, Viral 50 Nigeria | Viral 50 surfaces Gen-Z/TikTok breakouts before they chart. |
-| Audiomack | `audiomack.com/trending` + `/afrobeats` + `/amapiano` | Trending Now + genre pages. Also the best **download** source (below). |
+| Audiomack | `audiomack.com/trending` + `/afrobeats` + `/amapiano` | Trending Now + genre pages. **Discovery only since Oct 2026** — web downloads removed; see below. |
 | Boomplay NG | `boomplay.com` → Charts → Nigeria | Big for street-pop/local trends Spotify misses. |
 | Shazam NG | `shazam.com/charts/top-200/nigeria` | What people are hearing out and tagging — leading indicator. |
 | TikTok sounds | `tiktok.com` → search a sound/hashtag, or the Creative Center trending-sounds page | Gen-Z vibes and breakout snippets; note the exact track behind a viral sound. |
@@ -33,13 +33,12 @@ Reading tips:
 
 Resolve each missing track to the first of these that has it. Stop at the first legal hit.
 
-### 1. Audiomack (primary for Afrobeats/Amapiano)
-- Open the track page. A track is downloadable only if the artist enabled it — look for the
-  **Download** item in the `⋯` menu / the download arrow. If it is not there, the track is stream-only
-  here; move to the next source.
-- Download requires a free logged-in account. If not logged in, pause and ask the DJ to log in — never
-  enter their credentials yourself.
-- The file arrives in the browser Downloads folder. Then move+rename into `<save_path>`.
+### 1. Audiomack — discovery only (web downloads removed 2026-10)
+- Verified 2026-10-06 while logged in: track pages no longer show any download affordance at all —
+  Audiomack moved downloads to its mobile app / Plus. yt-dlp's old Audiomack endpoint
+  (`/api/music/url/song/...`) is dead, and `scripts/download.py` refuses audiomack.com.
+- Use Audiomack to find what's moving and where a track lives; fetch the file from the artist's own
+  links instead (SoundCloud free download, promo gate, or the DJ's pool).
 
 ### 2. SoundCloud
 - Many Afrobeats/edit/remix uploads carry a **Free Download** button or a "Buy"/"Download" link in the
@@ -65,7 +64,7 @@ guard. Run it before the downloader so fewer tracks end as `buy_only` — it nev
 
 ### The downloader script
 `scripts/download.py` drives the `yt-dlp` library (in-process) and is for the sources above that **offer** a free download
-(SoundCloud free links, Bandcamp, Audiomack downloadable tracks). It extracts best audio and
+(SoundCloud free links, Bandcamp). It extracts best audio and
 transcodes to MP3 320. It must **not** be pointed at YouTube/Spotify/Apple/Boomplay or any
 stream-only URL — that is the line in SKILL.md.
 
@@ -74,8 +73,8 @@ stream-only URL — that is the line in SKILL.md.
   Search patterns: `"<artist> <title>" linktree`, `<artist> promo download`, the artist's pinned post.
 - These are artist-sanctioned free downloads; complete the follow/email gate only if the DJ is OK
   with it, otherwise skip.
-- SoundCloud and Audiomack: check the **artist's profile**, not only site search — search misses
-  many street/indie uploads.
+- SoundCloud: check the **artist's profile**, not only site search — search misses many street/indie
+  uploads. On Audiomack, an artist profile only matters if it links their own download elsewhere.
 
 **Never:** 9jaflavour/naijaloaded-style leech blogs, generic "free mp3 download" Google results, or
 YouTube/Spotify rips. If it is not artist-enabled, licensed, or a store purchase — it is off-limits.

@@ -1,6 +1,6 @@
 ---
 name: dj-search
-description: A crate-digging assistant for DJs. Finds what is trending in the last 7/14/30 days (Afrobeats, Amapiano, Nigerian/naija pop, Gen-Z TikTok sounds, or any genre you name), checks whether you already own each track on your PC and your Google Drive so you never re-download, pulls the ones you are missing from legal free sources (Audiomack, SoundCloud, Bandcamp, artist/label promo, your DJ pools) as clean or dirty MP3s, and hands you a ranked crate with set-placement and BPM/key notes. Use this whenever the user types /dj-search or asks to find trending songs, build a crate, update their music library, dig for new Afrobeats/Amapiano/naija tracks, find DJ-ready downloads, or check what new music they are missing.
+description: A crate-digging assistant for DJs. Finds what is trending in the last 7/14/30 days (Afrobeats, Amapiano, Nigerian/naija pop, Gen-Z TikTok sounds, or any genre you name), checks whether you already own each track on your PC and your Google Drive so you never re-download, pulls the ones you are missing from legal free sources (SoundCloud, Bandcamp, artist/label promo, your DJ pools) as clean or dirty MP3s, and hands you a ranked crate with set-placement and BPM/key notes. Use this whenever the user types /dj-search or asks to find trending songs, build a crate, update their music library, dig for new Afrobeats/Amapiano/naija tracks, find DJ-ready downloads, or check what new music they are missing.
 ---
 
 # dj-search
@@ -17,7 +17,9 @@ input — set it to anything.
 This skill downloads **only** from sources that offer the track for free download, or that the DJ
 is licensed for:
 
-- **Audiomack** — free download when the artist enabled it (most Afrobeats/Amapiano promo lives here).
+- **Audiomack** — **discovery only since Oct 2026**: the web player no longer offers per-song downloads
+  at all (downloads moved to the mobile app / Plus) and the endpoint yt-dlp used is dead. Use it to find
+  tracks; get the file from the artist's own links (free SoundCloud download, promo gate) or a pool.
 - **SoundCloud** — tracks with a "Free Download" / "Buy" → free link.
 - **Bandcamp** — free or name-your-price downloads.
 - **Official artist/label promo** — Linktree/Hypeddit/ToneDen gates, newsletter drops.
@@ -129,15 +131,16 @@ isn't artist-enabled or licensed, the finish line is: listed as `buy_only` in th
 more. Summary:
 
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
-- Audiomack/SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it.
-  Files land in the browser's Downloads folder; the skill then moves+renames them.
+- SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it. Audiomack
+  has no web downloads anymore — only follow a download link the artist themselves posted. Files land
+  in the browser's Downloads folder; the skill then moves+renames them.
 - `scripts/resolve_sources.py` auto-resolves download URLs first: it searches SoundCloud and writes a
   `download_url` into candidates.json only when the uploader account itself looks like the artist and
   the track's free download is enabled (the API's `downloadable` flag) — run it after the scan/Drive
   steps so fewer tracks end as `buy_only`:
   `python scripts/resolve_sources.py --candidates "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json"`
 - `scripts/download.py` drives the `yt-dlp` library in-process for sources that *offer* a free download (SoundCloud/Bandcamp
-  free links, Audiomack). It is **not** for streaming/paywalled rips — see the legal line. Run it as
+  free links). It is **not** for streaming/paywalled rips — see the legal line. Run it as
   `python scripts/download.py --manifest "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json" --outdir "<save_path>" --confirm-free-download`
   (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
   Its final report lists every track **downloaded** (with path) and everything **skipped** (owned /

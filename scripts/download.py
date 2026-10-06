@@ -2,10 +2,14 @@
 """download.py - legal free-download fetcher for dj-search (yt-dlp library).
 
 Only for sources that actually offer the track for free or under the DJ's own
-license: Audiomack (artist enabled), SoundCloud (Free Download enabled),
-Bandcamp (free / name-your-price). Every other host is refused - YouTube,
-Spotify, Apple Music, Boomplay and piracy sites are discovery-only (see the
-legal line in SKILL.md). The allowlist below is enforced per URL.
+license: SoundCloud (Free Download enabled) and Bandcamp (free /
+name-your-price). Every other host is refused - YouTube, Spotify, Apple Music,
+Boomplay, Audiomack and piracy sites are discovery-only (see the legal line in
+SKILL.md). The allowlist below is enforced per URL.
+
+Audiomack was dropped from the allowlist 2026-10: its web player no longer
+offers per-song downloads at all (downloads moved to the mobile app / Plus) and
+yt-dlp's Audiomack endpoint is dead.
 
 Runs yt-dlp in-process via the `yt_dlp` Python package (no CLI subprocess), so
 interactive runs show a live download percentage on stderr.
@@ -42,7 +46,7 @@ try:
 except ImportError:  # reported as an install hint in main()
     YoutubeDL = None
 
-ALLOWED_HOSTS = ("audiomack.com", "soundcloud.com", "bandcamp.com")
+ALLOWED_HOSTS = ("soundcloud.com", "bandcamp.com")
 
 
 def host_allowed(url: str) -> bool:
@@ -172,7 +176,7 @@ def main(argv=None) -> int:
         raise SystemExit(
             "Refusing to download without --confirm-free-download.\n"
             "Only fetch tracks whose page actually offers a free/licensed download\n"
-            "(Audiomack / SoundCloud Free Download / Bandcamp / promo gate) - see SKILL.md.")
+            "(SoundCloud Free Download / Bandcamp / promo gate) - see SKILL.md.")
 
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
