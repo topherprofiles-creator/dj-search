@@ -163,7 +163,7 @@ Close with a short, opinionated read — this is the part a DJ actually wants:
 
 - Write `scripts/write_crate.py` output: `<save_path>/_dj-search/crate_<window>d_<date>.csv` and `.m3u8`
   (the .m3u8 holds every track with a real local file — downloaded here or already on the PC —
-  import-ready into Serato/rekordbox/Engine).
+  import-ready into Serato/rekordbox/VirtualDJ/Engine).
 - Print a compact table: downloaded / already-owned (PC) / buy-only / failed, plus the
   recommendations. Then stop.
 

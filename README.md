@@ -13,7 +13,7 @@ Type `/dj-search` in Claude Code and the skill:
 3. **Scans your PC** — `scripts/scan_library.py` walks your **entire PC and every plugged-in flash/removable drive** (`--all-drives`; system folders are pruned automatically), reads ID3v2/ID3v1, MP4/M4A atoms and FLAC tags offline (zero dependencies), and fuzzy-matches every candidate against what's there.
 4. **Downloads what's missing** — `resolve_sources.py` auto-resolves artist-enabled SoundCloud free downloads, then falls back to a matched YouTube audio pull (yt-dlp search; title + artist/`Topic` channel + duration check); `download.py` fetches, transcodes to MP3 320 and labels every track with its `download_source`. Tracks both stages miss get a browser lookup: the agent searches YouTube in your already-open Chrome, verifies the video by channel + length, records it with `--set-url`, and the same downloader fetches it. Only when all three routes come up empty does a track end as `buy_only` — never silently dropped.
 5. **Recommends like a DJ** — crate picks, rising vs. peaked, BPM/key groupings, harmonic-pair flags.
-6. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / Engine.
+6. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / VirtualDJ / Engine.
 
 ## Where downloads come from
 

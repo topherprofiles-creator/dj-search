@@ -7,7 +7,7 @@ into the output directory:
   crate_<window>d_<date>.csv   full ranked table (Excel-friendly UTF-8 BOM)
   crate_<window>d_<date>.m3u8  every track with a real local file - downloaded
                                here or matched on the PC (Serato / rekordbox /
-                               Engine import-ready)
+                               VirtualDJ / Engine import-ready)
 
 Called from SKILL.md step 7. A same-day re-run overwrites the same report file
 on purpose (it is a report, not a download); audio files are never touched.
