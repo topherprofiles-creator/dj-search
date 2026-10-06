@@ -341,9 +341,8 @@ def main(argv=None) -> int:
     if args.set_url:  # browser picks: record + exit - no lookups, no network
         return apply_set_urls(Path(args.candidates), args.set_url, args.dry_run)
 
-    client_id = get_client_id()
-
     if args.song:
+        client_id = get_client_id()
         artist, _, title = args.song.partition(" - ")
         artist, title = artist.strip(), (title.strip() or artist.strip())
         hit, ref = resolve_one(client_id, artist, title)
@@ -395,6 +394,7 @@ def main(argv=None) -> int:
             break
         to_do.append(entry)
     lookups = len(to_do)
+    client_id = get_client_id() if to_do else None  # don't scrape when nothing needs it
 
     def lookup(entry: dict) -> dict:
         """One candidate's two-stage lookup - safe to run in a worker thread
