@@ -312,7 +312,7 @@ def scan_roots(roots) -> list:
     for root in roots:
         rp = Path(root)
         if not rp.exists():
-            print(f"  ! root not found, skipping: {root}", file=sys.stderr)
+            print(f"  ! drive/folder not ready or not found, skipping: {root}", file=sys.stderr)
             continue
         for dirpath, dirnames, filenames in os.walk(rp):
             dirnames[:] = [d for d in dirnames

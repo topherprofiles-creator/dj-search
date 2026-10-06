@@ -63,6 +63,18 @@ def unique_base(outdir: Path, base: str) -> str:
     return f"{base} ({n})"
 
 
+def print_skipped(skipped: dict) -> None:
+    """Final report: what was skipped and why (owned / buy-only / no source found)."""
+    total = sum(len(v) for v in skipped.values())
+    if not total:
+        return
+    print(f"Skipped: {total}")
+    for reason, items in skipped.items():
+        if items:
+            names = ", ".join(items[:8]) + (" …" if len(items) > 8 else "")
+            print(f"  {reason}: {len(items)} — {names}")
+
+
 def find_ytdlp():
     exe = shutil.which("yt-dlp")
     if exe:
@@ -130,6 +142,13 @@ def main(argv=None) -> int:
     data = None
     manifest_path = None
     jobs = []  # (label, url, requested_name, manifest_entry_or_None)
+    skipped = {
+        "owned (already on PC/Drive)": [],
+        "already downloaded": [],
+        "buy_only (no legal free source)": [],
+        "failed earlier (not retried)": [],
+        "no download_url resolved": [],
+    }
     if args.manifest:
         manifest_path = Path(args.manifest)
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -142,13 +161,20 @@ def main(argv=None) -> int:
         for entry in data:
             if not isinstance(entry, dict):
                 continue
+            label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
             status = (entry.get("download_status") or "missing").strip().lower()
-            if entry.get("id") in owned_ids or status in ("owned", "downloaded", "buy_only", "failed"):
+            if entry.get("id") in owned_ids or status == "owned":
+                skipped["owned (already on PC/Drive)"].append(label)
+                continue
+            if status in ("downloaded", "buy_only", "failed"):
+                skipped[{"downloaded": "already downloaded",
+                         "buy_only": "buy_only (no legal free source)",
+                         "failed": "failed earlier (not retried)"}[status]].append(label)
                 continue
             url = (entry.get("download_url") or "").strip()
             if not url:
+                skipped["no download_url resolved"].append(label)
                 continue
-            label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
             variant = (entry.get("variant") or "").strip()
             name = label + (f" ({variant.capitalize()})" if variant else "")
             jobs.append((label, url, name, entry))
@@ -160,9 +186,11 @@ def main(argv=None) -> int:
 
     if not jobs:
         print("Nothing to download (no still-missing candidate has a download_url).")
+        print_skipped(skipped)
         return 0
 
     ok_count = fail_count = refused = 0
+    downloaded, failed_list = [], []
     for label, url, name, entry in jobs:
         if not host_allowed(url):
             host = urlparse(url).hostname or url
@@ -178,6 +206,7 @@ def main(argv=None) -> int:
         ok, result = download_one(url, outdir, base, args.quality, args.browser, ytdlp)
         if ok:
             ok_count += 1
+            downloaded.append((label, str(result)))
             print(f"  ok -> {result}")
             if entry is not None:
                 entry["download_status"] = "downloaded"
@@ -185,6 +214,7 @@ def main(argv=None) -> int:
                 entry["error"] = ""
         else:
             fail_count += 1
+            failed_list.append((label, str(result)))
             print(f"  FAILED: {result}")
             if entry is not None:
                 entry["download_status"] = "failed"
@@ -196,7 +226,16 @@ def main(argv=None) -> int:
         print(f"Updated {manifest_path}")
 
     if not args.dry_run:
+        if downloaded:
+            print("Downloaded:")
+            for label, path in downloaded:
+                print(f"  {label} -> {path}")
+        if failed_list:
+            print("Failed:")
+            for label, err in failed_list:
+                print(f"  {label}: {err}")
         print(f"Done: {ok_count} downloaded, {fail_count} failed, {refused} refused.")
+        print_skipped(skipped)
     return 0
 
 

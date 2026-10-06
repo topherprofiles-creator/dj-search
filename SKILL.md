@@ -104,6 +104,8 @@ See `references/sources.md` for the per-source recipe. Summary:
   free links, Audiomack). It is **not** for streaming/paywalled rips — see the legal line. Run it as
   `python scripts/download.py --manifest "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json" --outdir "<save_path>" --confirm-free-download`
   (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
+  Its final report lists every track **downloaded** (with path) and everything **skipped** (owned /
+  buy_only / no source found) — relay both to the DJ.
 - Name every file `Artist - Title (Clean).mp3` / `(Dirty).mp3`, 320 kbps where the source allows,
   written straight into `<save_path>`.
 - If no legal free source exists, mark the track `buy_only` with where to get it (pool/Beatport/iTunes)
