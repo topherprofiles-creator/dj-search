@@ -22,7 +22,7 @@ import urllib.request
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from scan_library import normalize, score  # noqa: E402
+from scan_library import normalize, score, _ratio  # noqa: E402
 
 API = "https://itunes.apple.com/search"
 HEADERS = {"User-Agent": "dj-search/1.0 (+https://github.com/topherprofiles-creator/dj-search)"}
@@ -62,23 +62,31 @@ def main(argv=None) -> int:
         title = (c.get("title") or "").strip()
         cand = {"na": normalize(artist), "nt": normalize(title),
                 "nall": normalize(f"{artist} {title}")}
-        best, best_sc = None, 0.0
+        best, best_rec, best_sc = None, None, 0.0
         c["error"] = ""
-        try:
-            for r in query(f"{artist} {title}", args.country):
-                rec = {
-                    "artist": r.get("artistName", ""),
-                    "title": r.get("trackName", ""),
-                    "na": normalize(r.get("artistName", "")),
-                    "nt": normalize(r.get("trackName", "")),
-                    "nall": normalize(f'{r.get("artistName", "")} {r.get("trackName", "")}'),
-                }
-                s = score(cand, rec)
-                if s > best_sc:
-                    best, best_sc = r, s
-        except Exception as exc:
-            c["error"] = f"store lookup failed: {exc}"[:160]
-        if best and best_sc >= args.min_score:
+        rows = []
+        for _attempt in range(2):  # public API: one retry if the call comes back empty
+            try:
+                rows = query(f"{artist} {title}", args.country)
+                if rows:
+                    break
+            except Exception as exc:
+                c["error"] = f"store lookup failed: {exc}"[:160]
+            time.sleep(3.0)
+        for r in rows:
+            rec = {
+                "artist": r.get("artistName", ""),
+                "title": r.get("trackName", ""),
+                "na": normalize(r.get("artistName", "")),
+                "nt": normalize(r.get("trackName", "")),
+                "nall": normalize(f'{r.get("artistName", "")} {r.get("trackName", "")}'),
+            }
+            s = score(cand, rec)
+            if s > best_sc:
+                best, best_rec, best_sc = r, rec, s
+        title_sim = (max(_ratio(cand["nt"], best_rec["nt"]), _ratio(cand["nt"], best_rec["nall"]))
+                     if best_rec else 0.0)
+        if best and best_sc >= args.min_score and title_sim >= 0.8:
             c["download_url"] = best.get("trackViewUrl", "")
             c["download_status"] = "buy_only"
             c["error"] = ""
@@ -90,7 +98,7 @@ def main(argv=None) -> int:
             if not c.get("error"):
                 c["error"] = "no store match found"
             miss_lines.append(f"  no match: {artist} - {title}")
-        time.sleep(1.1)  # be polite to the public API
+        time.sleep(2.0)  # be polite to the public API
 
     path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
     print(f"\nDone: {filled} buy links filled, {unmatched} unmatched, "
