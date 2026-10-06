@@ -9,6 +9,8 @@ downloaded again.
 
 Called by SKILL.md step 3 (the PC scan). Read-only:
 it never writes to, moves, renames or deletes any audio file.
+Per-file tags are cached in ~/.dj-search/scan_cache.json (--cache / --no-cache)
+so repeat scans only tag-read new or changed files.
 
   python scripts/scan_library.py \
       --candidates "C:/DJ/Crates/_dj-search/candidates.json" \
@@ -307,6 +309,38 @@ def make_record(path_str: str, read_file: bool) -> dict:
     }
 
 
+# --------------------------------------------------------------------------- cache
+
+CACHE_VERSION = 1
+
+
+def default_cache_path() -> Path:
+    return Path.home() / ".dj-search" / "scan_cache.json"
+
+
+def load_cache(path: Path) -> dict:
+    """path-key -> {size, mtime, rec} from the previous run; {} on any problem."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        if data.get("version") == CACHE_VERSION and isinstance(data.get("files"), dict):
+            return data["files"]
+    except Exception:
+        pass
+    return {}
+
+
+def save_cache(path: Path, files: dict) -> None:
+    """Best-effort - a failed cache write must never break a scan."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + ".tmp")
+        tmp.write_text(json.dumps({"version": CACHE_VERSION, "files": files}),
+                       encoding="utf-8")
+        os.replace(tmp, path)
+    except Exception:
+        pass
+
+
 def scan_roots(roots) -> list:
     files, seen = [], set()
     for root in roots:
@@ -474,6 +508,9 @@ def main(argv=None) -> int:
     ap.add_argument("--soft-threshold", type=float, default=0.62,
                     help="score at/above which a match is shown for review (default 0.62)")
     ap.add_argument("--quiet", action="store_true")
+    ap.add_argument("--cache", help="scan cache file (default: ~/.dj-search/scan_cache.json)")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="ignore and do not write the scan cache (full tag re-read)")
     args = ap.parse_args(argv)
 
     roots = list(args.roots)
@@ -489,15 +526,42 @@ def main(argv=None) -> int:
     pc_paths = scan_roots(roots)
     drive_paths = load_drive_listing(args.drive_listing) if args.drive_listing else []
 
+    cache_path = Path(args.cache) if args.cache else default_cache_path()
+    cache = {} if args.no_cache else load_cache(cache_path)
+    cached_files = {}
+    from_cache = read_count = 0
+
     pc_records, drive_records = [], []
     if not args.quiet:
-        print(f"Scanned {len(pc_paths):,} audio files, reading tags...")
-    for n, p in enumerate(pc_paths, 1):
-        pc_records.append(make_record(p, read_file=True))
-        if not args.quiet and n % 500 == 0:
-            print(f"\r  tags: {n:,}/{len(pc_paths):,}", end="", flush=True)
+        known = "" if args.no_cache else f" ({len(cache):,} known - only new/changed files get tag-read)"
+        print(f"Scanned {len(pc_paths):,} audio files{known}, reading tags...")
+    for p in pc_paths:
+        key = os.path.normcase(p)
+        try:
+            st = os.stat(p)
+        except OSError:
+            st = None
+        ent = cache.get(key)
+        if st is not None and ent and ent.get("size") == st.st_size and ent.get("mtime") == st.st_mtime:
+            rec = dict(ent["rec"])  # unchanged since last run - no tag read at all
+            rec["path"] = p
+            from_cache += 1
+        else:
+            rec = make_record(p, read_file=True)
+            read_count += 1
+        if st is not None and not args.no_cache:
+            cached_files[key] = {"size": st.st_size, "mtime": st.st_mtime,
+                                 "rec": {k: rec[k] for k in
+                                         ("artist", "title", "source", "na", "nt", "nall")}}
+        pc_records.append(rec)
+        if not args.quiet and read_count and read_count % 500 == 0:
+            print(f"\r  tags: {read_count:,} read / {from_cache:,} cached", end="", flush=True)
     if not args.quiet and pc_paths:
-        print(f"\r  tags: {len(pc_paths):,}/{len(pc_paths):,}")
+        print(f"\r  tags: {read_count:,} read / {from_cache:,} cached   ")
+    if not args.no_cache and cached_files:
+        merged = dict(cache)  # union-merge: an unplugged drive keeps its entries
+        merged.update(cached_files)
+        save_cache(cache_path, merged)
     for p in drive_paths:
         drive_records.append(make_record(p, read_file=False))
 

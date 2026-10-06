@@ -68,7 +68,10 @@ It walks for audio files (`.mp3 .wav .flac .m4a .aac .ogg .opus .aiff`), reads I
 and FLAC tags (filename fallback) and normalises names (drops
 `feat.`, brackets, punctuation, case) and fuzzy-matches each candidate. Output marks every
 candidate `owned` / `missing` with the matched file path and a confidence score. Treat <0.82 as a
-soft match — show it, let the DJ decide, do not silently skip.
+soft match — show it, let the DJ decide, do not silently skip. The scan is **incremental**:
+per-file tags are cached in `~/.dj-search/scan_cache.json` (keyed on path + size + mtime), so
+repeat runs only tag-read new or changed files — a whole-PC scan drops from a minute to seconds.
+`--no-cache` forces a full re-read.
 
 ### 4. Download the missing ones — free sources, YouTube, then the browser lookup
 

@@ -112,7 +112,7 @@ Builds a synthetic library (fake ID3 tags, a filename-only file, an offline-list
 - **ffmpeg missing / no MP3 out** — install ffmpeg and make sure it's on PATH.
 - **SoundCloud asks for a login** — the skill pauses and asks *you* to log in; it never enters credentials. For yt-dlp you can pass `--browser chrome` (close Chrome first — its cookie database is locked while running).
 - **Audiomack has no download button** — expected since Oct 2026: web downloads were removed (app / Plus only) and the old yt-dlp endpoint is dead, so the skill treats Audiomack as discovery-only.
-- **The whole-PC scan takes a while on the first run** — every audio file on every drive is tag-read once (system folders are skipped); matching itself is indexed and fast. Narrow it with `--roots <folder>` if you want it quicker.
+- **The whole-PC scan is incremental after the first run** — per-file tags are cached in `~/.dj-search/scan_cache.json` (path + size + mtime), so later scans only tag-read new or changed files: the first full pass takes ~a minute, every scan after it is seconds. `--no-cache` forces a full re-read.
 - **Big crate runs (50–100 tracks)** — `resolve_sources.py` and `download.py` work in parallel (`--jobs N`, default 6; 1 = serial) and retry transient YouTube 403s automatically. A 100-track crate is roughly a 15-minute job; a few tracks may still need one `--retry-failed` pass.
 
 ## Contributing

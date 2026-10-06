@@ -17,6 +17,8 @@ plus a 3-entry candidates.json, then asserts:
   - resolve_sources.py --set-url records a browser-picked URL offline (no network),
     labels it youtube-browser, and un-parks a buy_only row
   - download.py --dry-run --jobs N still reports every job (no network)
+  - the scan cache: a second scan reuses tag reads ("0 read / 3 cached") and
+    produces identical results (an isolated --cache file; the user's is untouched)
 
 Run:  python tests/smoke_test.py
 """
@@ -82,7 +84,7 @@ def main() -> int:
         have = tmp / "have_pc.json"
         subprocess.run([sys.executable, str(SCAN), "--candidates", str(cpath),
                         "--roots", str(lib), "--drive-listing", str(tmp / "drive.txt"),
-                        "--out", str(have), "--quiet"], check=True)
+                        "--out", str(have), "--no-cache", "--quiet"], check=True)
         results = {r["id"]: r for r in json.loads(have.read_text(encoding="utf-8"))["results"]}
 
         r1 = results["cand-001"]
@@ -184,8 +186,21 @@ def main() -> int:
         assert dry.returncode == 0, dry.stderr
         assert dry.stdout.count("WOULD DOWNLOAD") == 3, dry.stdout
 
+        # --- scan cache: second scan reuses tag reads (offline, isolated) -----
+        cache_file = tmp / "scan_cache.json"
+        have2 = tmp / "have2.json"
+        scan_cmd = [sys.executable, str(SCAN), "--candidates", str(cpath),
+                    "--roots", str(lib), "--drive-listing", str(tmp / "drive.txt"),
+                    "--out", str(have2), "--cache", str(cache_file)]
+        r1 = subprocess.run(scan_cmd, capture_output=True, text=True, check=True)
+        assert "0 cached" in r1.stdout, r1.stdout
+        r2 = subprocess.run(scan_cmd, capture_output=True, text=True, check=True)
+        assert "0 read / 3 cached" in r2.stdout, r2.stdout
+        assert (json.loads(have2.read_text(encoding="utf-8"))["results"]
+                == json.loads(have.read_text(encoding="utf-8"))["results"]), "cached scan must match"
+
         print("PASS - scan de-dup (pc / drive / missing), crate outputs, download allowlist, "
-              "YouTube match scoring, --set-url and --jobs dry-run verified")
+              "YouTube match scoring, --set-url, --jobs dry-run and scan cache verified")
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
