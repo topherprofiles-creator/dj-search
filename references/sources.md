@@ -61,7 +61,8 @@ Resolve each missing track to the first of these that has it. Stop at the first 
 into candidates.json only when the uploader account itself looks like the artist and the track's free
 download is enabled (API `downloadable` flag). Fan re-uploads of label songs are rejected by the uploader
 guard. When SoundCloud has nothing it runs the YouTube fallback below. Run it before the downloader so
-fewer tracks end as `buy_only`; `--no-youtube` stops at SoundCloud.
+fewer tracks end as `buy_only`; `--no-youtube` stops at SoundCloud. Its `--set-url` mode records a
+browser-picked URL (see the browser step below) and exits without any network lookups.
 
 ### The YouTube fallback (resolver stage 2, default on)
 When SoundCloud has no artist-enabled free download, the resolver searches YouTube via yt-dlp
@@ -75,6 +76,23 @@ When SoundCloud has no artist-enabled free download, the resolver searches YouTu
 
 Pick: best score, then most views. Written into the manifest as
 `download_source: "youtube:<channel>"` with `match_confidence` recorded.
+
+### The browser step (when both automated stages miss)
+For tracks the resolver reports as no-match, search by eye in the already-open Chrome
+(chrome-devtools `--autoConnect`; never close, kill, relaunch or copy the browser):
+
+1. `youtube.com/results?search_query=<artist> <title>` — read the result list.
+2. Accept a video only when the channel is the artist's own account or `<Artist> - Topic` (label
+   uploads need the artist named in the title) *and* the length on the watch page matches the
+   reference (`duration_s`, or the artist's SoundCloud upload length, ±5s). Skip
+   sped-up/slowed/nightcore/remix/cover edits; two equal candidates → ask the DJ to pick.
+3. Record the URL — offline, atomic manifest write:
+   `python scripts/resolve_sources.py --candidates <candidates.json> --set-url "<id>=<video URL>"`
+   → sets `download_url`, `download_source: "youtube-browser"`, `match_confidence: "browser"`, and
+   un-parks `buy_only`/`failed` rows back to `missing`.
+4. Fetch with the normal `download.py --manifest ...` run — same pipeline, same report.
+   Age/sign-in-walled videos: if a recorded URL then fails to download, it needs browser cookies
+   (`download.py --browser chrome`, Chrome closed) — otherwise surface it to the DJ and move on.
 
 ### The downloader script
 `scripts/download.py` drives the `yt-dlp` library (in-process) and fetches what the resolver wrote:

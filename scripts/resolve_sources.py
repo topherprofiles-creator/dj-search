@@ -30,6 +30,10 @@ Usage:
 
   python scripts/resolve_sources.py --song "Artist - Title"    # one JSON line out
 
+  # browser step: record a video picked by eye when both stages miss (no network):
+  python scripts/resolve_sources.py --candidates "<save>/_dj-search/candidates.json" \
+      --set-url "cand-007=https://www.youtube.com/watch?v=..."
+
 Requirements: stdlib only for the SoundCloud stage; the YouTube fallback
 additionally needs the yt-dlp package (`python -m pip install -U yt-dlp`) and
 is skipped with a note when it is missing.
@@ -263,9 +267,55 @@ def resolve_youtube(artist: str, title: str, ref_duration=None):
     }
 
 
+def apply_set_urls(path: Path, specs: list, dry_run: bool) -> int:
+    """Record manually picked download URLs (the browser step) into the manifest.
+
+    Runs no network lookups and exits after writing - used when the resolver
+    could not find a match and the agent picked the video by eye in the live
+    browser. Sets download_url / download_source / match_confidence and puts a
+    parked buy_only/failed row back to missing so the downloader picks it up."""
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
+    if not isinstance(data, list):
+        raise SystemExit("candidates must be a JSON array")
+    by_id = {str(e.get("id")): e for e in data if isinstance(e, dict)}
+    count = 0
+    for spec in specs:
+        cid, sep, url = spec.partition("=")
+        cid, url = cid.strip(), url.strip()
+        if not sep or not cid or not url:
+            raise SystemExit(f"--set-url needs ID=URL, got: {spec!r}")
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname:
+            raise SystemExit(f"--set-url: not a usable URL: {url!r}")
+        entry = by_id.get(cid)
+        if entry is None:
+            raise SystemExit(f"--set-url: no candidate with id {cid!r}")
+        host = parsed.hostname.lower()
+        source = ("youtube-browser" if host == "youtu.be" or host.endswith("youtube.com")
+                  else f"browser:{host}")
+        label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
+        print(f"SET  {label}  ({cid})\n  {url}\n  download_source: {source}")
+        if not dry_run:
+            entry["download_url"] = url
+            entry["download_source"] = source
+            entry["match_confidence"] = "browser"
+            if (entry.get("download_status") or "").strip().lower() in ("buy_only", "failed"):
+                entry["download_status"] = "missing"
+                entry["error"] = ""
+        count += 1
+    if not dry_run:
+        tmp = path.with_name(path.name + ".tmp")  # atomic replace, as everywhere
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
+        print(f"Updated {path}")
+    print(f"Done: {count} browser URL(s) recorded.")
+    return 0
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
-        description="Resolve legal, artist-enabled SoundCloud download URLs for dj-search.")
+        description="Resolve download URLs for dj-search candidates "
+                    "(SoundCloud free downloads, then a scored YouTube fallback).")
     ap.add_argument("--candidates", help="candidates.json to scan and update in place")
     ap.add_argument("--have", help="have_pc.json - owned candidates are skipped")
     ap.add_argument("--song", help="single mode: 'Artist - Title' (prints one JSON line)")
@@ -273,10 +323,18 @@ def main(argv=None) -> int:
     ap.add_argument("--max", type=int, help="stop after N candidate lookups (quick runs)")
     ap.add_argument("--no-youtube", action="store_true",
                     help="skip the YouTube fallback (artist-enabled free sources only)")
+    ap.add_argument("--set-url", action="append", default=[], metavar="ID=URL",
+                    help="browser step: record a manually picked download URL for a candidate "
+                         "(repeatable; writes the manifest and exits, no network)")
     args = ap.parse_args(argv)
 
     if bool(args.candidates) == bool(args.song):
         ap.error("give exactly one of --candidates or --song")
+    if args.set_url and not args.candidates:
+        ap.error("--set-url needs --candidates (manifest mode)")
+
+    if args.set_url:  # browser picks: record + exit - no lookups, no network
+        return apply_set_urls(Path(args.candidates), args.set_url, args.dry_run)
 
     client_id = get_client_id()
 

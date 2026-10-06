@@ -83,7 +83,7 @@ In order of preference (details in `references/sources.md`):
 
 Merge PC + Drive into one `owned` set. Only genuinely-missing tracks go to step 5.
 
-### 5. Download the missing ones — free sources first, YouTube fallback after
+### 5. Download the missing ones — free sources, YouTube, then the browser lookup
 
 For each missing track, resolve a download URL and fetch it, in this order:
 
@@ -100,6 +100,19 @@ For each missing track, resolve a download URL and fetch it, in this order:
    `download_source: "youtube:<channel>"` in the manifest, `match_confidence` is recorded, and the
    downloader prints `(YouTube fallback)` for each so the report stays honest about where files came
    from. Tracks a previous run parked as `buy_only` are automatically reconsidered.
+3. **Browser lookup (agent step — only for the resolver's no-match lines)** — when the resolver
+   prints `NO ARTIST-ENABLED FREE SOURCE AND NO YOUTUBE MATCH`, do what a human would: search it
+   yourself in the DJ's already-open Chrome (chrome-devtools `--autoConnect` — never close, kill,
+   relaunch or copy the browser). Open `youtube.com/results?search_query=<artist title>`, prefer
+   `<Artist> - Topic` / the artist's own channel, open the video and check the length on the watch
+   page against the reference (`duration_s`, or the artist's SoundCloud length) — reject
+   sped-up/slowed/remix/cover edits the same way the matcher would. Two equally good results → show
+   the DJ both titles/channels and let them pick. Record the pick — no network, atomic manifest
+   write — and fetch it through the **same** downloader, so it lands as `youtube-browser`,
+   `match_confidence: "browser"`, and is reported like any other track:
+   `python scripts/resolve_sources.py --candidates "<save_path>/_dj-search/candidates.json" --set-url "cand-007=<video URL>"`
+   then the normal `download.py --manifest ...` run. (YouTube has no browser "save file" — the
+   browser step finds and verifies the video; the downloader is what pulls the MP3 320.)
 
 **Absolute rule — no track ends unresolved (the streak rule: keep going until it's downloaded).**
 Every missing track must finish as exactly one of:
@@ -108,17 +121,19 @@ Every missing track must finish as exactly one of:
   (the manifest records which, in `download_source`)
 - **promo** — an official artist/label promo link was found; set `download_status: "promo"` and put
   the gate link in `download_url` (no file is fetched — the DJ completes the gate)
-- **buy_only** — neither a free/artist-enabled source nor a plausible YouTube match exists; list it
-  in the report with this status and move on. This skill **never** pushes payments and never carries
-  store links.
+- **buy_only** — no free/artist-enabled source, no automatic YouTube match, and the browser lookup
+  found nothing either; list it in the report with this status and move on. This skill **never**
+  pushes payments and never carries store links.
 
 Never silently drop a track. Keep looping **resolve → download → retry** until every track lands in
 one of those buckets: on reruns pass `--retry-failed` to `download.py` so previously failed tracks get
-another shot. `buy_only` is a resolved end state, not a miss — it now means the free-source hunt and
-the YouTube match both came up empty. And it never widens the source list to leeching: **no
-9jaflavour-style blogs, no "free mp3" sites from Google results** — the only fallback beyond
-artist-enabled sources is the matched YouTube audio pull above (yt-dlp, title/channel/length-checked,
-labeled in the manifest). Spotify / Apple Music / Boomplay / Audiomack stay discovery-only. Summary:
+another shot. `buy_only` is a resolved end state, not a miss — it now means the free-source hunt,
+the automatic YouTube match, and the browser lookup all came up empty. And it never widens the
+source list to leeching: **no
+9jaflavour-style blogs, no "free mp3" sites from Google results** — the fallbacks beyond
+artist-enabled sources are the matched YouTube audio pull above (yt-dlp, title/channel/length-checked,
+labeled in the manifest) and the browser lookup. Spotify / Apple Music / Boomplay / Audiomack stay
+discovery-only. Summary:
 
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
 - `scripts/resolve_sources.py` auto-resolves download URLs first (SoundCloud, then the YouTube

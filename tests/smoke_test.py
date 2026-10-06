@@ -14,6 +14,8 @@ plus a 3-entry candidates.json, then asserts:
   - download.source_kind() classifies legal/youtube/other URLs, and
     resolve_sources.youtube_match_score() accepts artist/topic/duration-consistent
     results while rejecting wrong edits and unverifiable strangers (no network)
+  - resolve_sources.py --set-url records a browser-picked URL offline (no network),
+    labels it youtube-browser, and un-parks a buy_only row
 
 Run:  python tests/smoke_test.py
 """
@@ -28,6 +30,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 SCAN = ROOT / "scripts" / "scan_library.py"
 CRATE = ROOT / "scripts" / "write_crate.py"
+RESOLVE = ROOT / "scripts" / "resolve_sources.py"
 
 FAKE_AUDIO = b"\xff\xfb\x90\x00" + b"\x00" * 400  # header-ish bytes; never decoded
 
@@ -144,8 +147,27 @@ def main() -> int:
         assert rs.youtube_match_score(artist, title, stranger, None) == (0, "")
         assert rs.youtube_match_score(artist, title, stranger, 237)[0] > 0  # duration-only OK
 
+        # --- browser step: --set-url records the pick offline -----------------
+        data = json.loads(cpath.read_text(encoding="utf-8"))
+        for e in data:
+            if e["id"] == "cand-003":
+                e["download_status"] = "buy_only"     # parked - must come back to missing
+        cpath.write_text(json.dumps(data, indent=2), encoding="utf-8")
+        subprocess.run([sys.executable, str(RESOLVE), "--candidates", str(cpath),
+                        "--set-url", "cand-003=https://youtu.be/abc123"], check=True)
+        c3 = next(e for e in json.loads(cpath.read_text(encoding="utf-8"))
+                  if e["id"] == "cand-003")
+        assert c3["download_url"] == "https://youtu.be/abc123", c3
+        assert c3["download_source"] == "youtube-browser", c3
+        assert c3["match_confidence"] == "browser", c3
+        assert c3["download_status"] == "missing", c3
+        bad = subprocess.run([sys.executable, str(RESOLVE), "--candidates", str(cpath),
+                              "--set-url", "cand-999=https://youtu.be/x"],
+                             capture_output=True, text=True)
+        assert bad.returncode != 0, bad
+
         print("PASS - scan de-dup (pc / drive / missing), crate outputs, "
-              "download allowlist and YouTube match scoring verified")
+              "download allowlist, YouTube match scoring and --set-url verified")
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

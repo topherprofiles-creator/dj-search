@@ -12,7 +12,7 @@ Type `/dj-search` in Claude Code and the skill:
 2. **Discovers** what's moving — reads TurnTable Charts, Apple Music NG, Spotify NG + Viral, Audiomack, Boomplay, Shazam NG and TikTok trending sounds in your live Chrome, intersects the charts, and keeps only entries moving inside your window.
 3. **Scans your PC** — `scripts/scan_library.py` walks your **entire PC and every plugged-in flash/removable drive** (`--all-drives`; system folders are pruned automatically), reads ID3v2/ID3v1, MP4/M4A atoms and FLAC tags offline (zero dependencies), and fuzzy-matches every candidate against what's there.
 4. **Checks Google Drive** — mounted Drive letter, an `rclone` listing, or a browser search — so you never re-download what's already in the cloud.
-5. **Downloads what's missing** — `resolve_sources.py` auto-resolves artist-enabled SoundCloud free downloads, then falls back to a matched YouTube audio pull (yt-dlp search; title + artist/`Topic` channel + duration check); `download.py` fetches, transcodes to MP3 320 and labels every track with its `download_source`. Only when both routes come up empty does a track end as `buy_only` — never silently dropped.
+5. **Downloads what's missing** — `resolve_sources.py` auto-resolves artist-enabled SoundCloud free downloads, then falls back to a matched YouTube audio pull (yt-dlp search; title + artist/`Topic` channel + duration check); `download.py` fetches, transcodes to MP3 320 and labels every track with its `download_source`. Tracks both stages miss get a browser lookup: the agent searches YouTube in your already-open Chrome, verifies the video by channel + length, records it with `--set-url`, and the same downloader fetches it. Only when all three routes come up empty does a track end as `buy_only` — never silently dropped.
 6. **Recommends like a DJ** — crate picks, rising vs. peaked, BPM/key groupings, harmonic-pair flags.
 7. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / Engine.
 
@@ -29,6 +29,11 @@ Downloads run in this order, and every file is labeled with its origin (`downloa
    looks like the artist's own account / `<Artist> - Topic`, and — when a reference duration is
    known — the length agrees within a few seconds, which rejects sped-up / slowed / remix edits.
    These show as `youtube:<channel>` in the manifest, never silently mixed in.
+3. **Browser lookup** (agent step, for tracks both automated stages miss) — the agent searches
+   YouTube in your already-open Chrome the way a human would, verifies the video by channel and
+   length, and records it with `--set-url` (`youtube-browser` in the manifest). The same downloader
+   fetches it. *(YouTube has no browser "save file" — the browser finds and verifies the video;
+   yt-dlp pulls the audio and transcodes.)*
 
 Still off-limits: 9jaflavour/naijaloaded-style leech blogs and "free mp3" Google results — and this
 skill never includes payment paths; when nothing matches, the track is listed `buy_only` and left there.
