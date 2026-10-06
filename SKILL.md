@@ -141,13 +141,18 @@ discovery-only. Summary:
   scan/Drive steps:
   `python scripts/resolve_sources.py --candidates "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json"`
   (add `--no-youtube` for a free-sources-only run). It needs the `yt-dlp` package for the fallback;
-  without it, only the SoundCloud stage runs.
+  without it, only the SoundCloud stage runs. Lookups run in parallel (`--jobs N`, default 6).
 - `scripts/download.py` drives the `yt-dlp` library in-process and fetches what the resolver wrote:
   SoundCloud/Bandcamp free links plus the matched YouTube fallback URLs. Run it as
   `python scripts/download.py --manifest "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json" --outdir "<save_path>" --confirm-free-download`
   (it refuses any other host, prints `(YouTube fallback)` per such track, and updates
-  `download_status`/`local_path` per track; `--no-youtube` skips fallback tracks). Its final report
+  `download_status`/`local_path` per track; `--no-youtube` skips fallback tracks). Downloads run in
+  parallel too (`--jobs N`, default 6) with one automatic retry on transient 403s. Its final report
   lists every track **downloaded** (with path) and everything **skipped** — relay both to the DJ.
+- **Big crates (50–100 tracks)** are the same flow — both scripts parallelize, so at the defaults
+  100 tracks is ~10 min of resolving + ~5–10 min of downloading. For big lists read each chart in
+  one page-pull (whole Top 100 at once) instead of track-by-track, and expect a handful of YouTube
+  403s under load: one more `download.py --retry-failed` pass (or the browser step) sweeps them.
 - What the two scripts could not get, hunt by hand: SoundCloud/Bandcamp artist profiles and official
   promo gates. Confirm a real Download/Free affordance before using it (Audiomack has no web downloads
   anymore — only follow a download link the artist themselves posted). Files land in the browser's

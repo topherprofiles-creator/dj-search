@@ -16,6 +16,7 @@ plus a 3-entry candidates.json, then asserts:
     results while rejecting wrong edits and unverifiable strangers (no network)
   - resolve_sources.py --set-url records a browser-picked URL offline (no network),
     labels it youtube-browser, and un-parks a buy_only row
+  - download.py --dry-run --jobs N still reports every job (no network)
 
 Run:  python tests/smoke_test.py
 """
@@ -166,8 +167,25 @@ def main() -> int:
                              capture_output=True, text=True)
         assert bad.returncode != 0, bad
 
-        print("PASS - scan de-dup (pc / drive / missing), crate outputs, "
-              "download allowlist, YouTube match scoring and --set-url verified")
+        # --- parallel dry-run reports every job (offline) ---------------------
+        dry_manifest = tmp / "dry.json"
+        dry_manifest.write_text(json.dumps([
+            {"id": "d1", "artist": "A One", "title": "T One", "download_status": "missing",
+             "download_url": "https://youtu.be/aaaaaaaaaaa"},
+            {"id": "d2", "artist": "B Two", "title": "T Two", "download_status": "missing",
+             "download_url": "https://youtu.be/bbbbbbbbbbb"},
+            {"id": "d3", "artist": "C Three", "title": "T Three", "download_status": "missing",
+             "download_url": "https://youtu.be/ccccccccccc"},
+        ]), encoding="utf-8")
+        dry = subprocess.run([sys.executable, str(ROOT / "scripts" / "download.py"),
+                              "--manifest", str(dry_manifest), "--outdir", str(tmp / "dryout"),
+                              "--confirm-free-download", "--dry-run", "--jobs", "3"],
+                             capture_output=True, text=True)
+        assert dry.returncode == 0, dry.stderr
+        assert dry.stdout.count("WOULD DOWNLOAD") == 3, dry.stdout
+
+        print("PASS - scan de-dup (pc / drive / missing), crate outputs, download allowlist, "
+              "YouTube match scoring, --set-url and --jobs dry-run verified")
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

@@ -122,6 +122,7 @@ Builds a synthetic library (fake ID3 tags, a filename-only file, a Drive-only tr
 - **Audiomack has no download button** — expected since Oct 2026: web downloads were removed (app / Plus only) and the old yt-dlp endpoint is dead, so the skill treats Audiomack as discovery-only.
 - **Drive letter missing** — Google Drive for Desktop may mount under a different letter; check `Get-PSDrive` (Windows) or the Finder sidebar (macOS), or use the rclone route.
 - **The whole-PC scan takes a while on the first run** — every audio file on every drive is tag-read once (system folders are skipped); matching itself is indexed and fast. Narrow it with `--roots <folder>` if you want it quicker.
+- **Big crate runs (50–100 tracks)** — `resolve_sources.py` and `download.py` work in parallel (`--jobs N`, default 6; 1 = serial) and retry transient YouTube 403s automatically. A 100-track crate is roughly a 15-minute job; a few tracks may still need one `--retry-failed` pass.
 
 ## Contributing
 

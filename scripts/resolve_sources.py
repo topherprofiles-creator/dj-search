@@ -44,6 +44,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import random
 import re
 import sys
 import time
@@ -51,6 +52,7 @@ import unicodedata
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -201,7 +203,8 @@ def search_youtube(artist: str, title: str, limit: int = YT_SEARCH_LIMIT) -> lis
         raise RuntimeError("yt-dlp not installed (python -m pip install -U yt-dlp)")
     query = f"{main_artist(artist)} {title}".strip()
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True,
-            "skip_download": True, "socket_timeout": 30}
+            "skip_download": True, "socket_timeout": 30,
+            "ignoreerrors": True}  # one dead result must not kill the whole search
     with YoutubeDL(opts) as ydl:
         info = ydl.extract_info(f"ytsearch{limit}:{query}", download=False)
     return [e for e in ((info or {}).get("entries") or []) if isinstance(e, dict)]
@@ -321,6 +324,8 @@ def main(argv=None) -> int:
     ap.add_argument("--song", help="single mode: 'Artist - Title' (prints one JSON line)")
     ap.add_argument("--dry-run", action="store_true", help="report only, write nothing")
     ap.add_argument("--max", type=int, help="stop after N candidate lookups (quick runs)")
+    ap.add_argument("--jobs", type=int, default=6,
+                    help="parallel lookups (default 6; 1 = serial)")
     ap.add_argument("--no-youtube", action="store_true",
                     help="skip the YouTube fallback (artist-enabled free sources only)")
     ap.add_argument("--set-url", action="append", default=[], metavar="ID=URL",
@@ -368,50 +373,63 @@ def main(argv=None) -> int:
 
     resolved = yt_resolved = skipped = lookups = 0
     no_source = []
-    warned_no_ytdlp = False
     skip_statuses = {"owned", "downloaded", "promo"}
     if args.no_youtube:
         skip_statuses.add("buy_only")  # legal-only runs leave them parked
+
+    yt_available = yt_import() is not None
+    if not args.no_youtube and not yt_available:
+        print("yt-dlp not installed - YouTube fallback skipped "
+              "(python -m pip install -U yt-dlp)")
+
+    to_do = []
     for entry in data:
         if not isinstance(entry, dict):
             continue
-        label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
         status = (entry.get("download_status") or "missing").strip().lower()
         if (str(entry.get("id")) in owned_ids or status in skip_statuses
                 or (entry.get("download_url") or "").strip()):
             skipped += 1
             continue
-        if args.max is not None and lookups >= args.max:
+        if args.max is not None and len(to_do) >= args.max:
             break
-        lookups += 1
+        to_do.append(entry)
+    lookups = len(to_do)
 
+    def lookup(entry: dict) -> dict:
+        """One candidate's two-stage lookup - safe to run in a worker thread
+        (each call owns its HTTP session and its yt-dlp instance)."""
+        artist, title = entry.get("artist", ""), entry.get("title", "")
         ref = entry.get("duration_s") or None
         hit = None
-        lookup_failed = False
+        error = None
         try:
-            hit, sc_ref = resolve_one(client_id, entry.get("artist", ""), entry.get("title", ""))
+            hit, sc_ref = resolve_one(client_id, artist, title)
             ref = ref or sc_ref
         except SystemExit:
             raise
         except Exception as exc:
-            print(f"ERROR  {label}: {type(exc).__name__}: {exc}")
-            lookup_failed = True
+            error = f"{type(exc).__name__}: {exc}"
         finally:
-            time.sleep(0.6)  # stay polite with the API, even after errors
-
+            time.sleep(0.6 + random.uniform(0, 0.4))  # polite pacing, workers or not
         yt_hit = None
-        if not hit and not args.no_youtube:
-            if yt_import() is None:
-                if not warned_no_ytdlp:
-                    print("yt-dlp not installed - YouTube fallback skipped "
-                          "(python -m pip install -U yt-dlp)")
-                    warned_no_ytdlp = True
-            else:
-                try:
-                    yt_hit = resolve_youtube(entry.get("artist", ""), entry.get("title", ""), ref)
-                except Exception as exc:
-                    print(f"ERROR  {label} (youtube): {type(exc).__name__}: {exc}")
+        yt_error = None
+        if hit is None and not args.no_youtube and yt_available:
+            try:
+                yt_hit = resolve_youtube(artist, title, ref)
+            except Exception as exc:
+                yt_error = f"{type(exc).__name__}: {exc}"
+        return {"ref": ref, "hit": hit, "error": error, "yt_hit": yt_hit, "yt_error": yt_error}
 
+    def apply_result(entry: dict, res: dict) -> None:
+        nonlocal resolved, yt_resolved
+        label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
+        status = (entry.get("download_status") or "missing").strip().lower()
+        if res["error"]:
+            print(f"ERROR  {label}: {res['error']}")
+        if res["yt_error"]:
+            print(f"ERROR  {label} (youtube): {res['yt_error']}")
+        hit, yt_hit, ref = res["hit"], res["yt_hit"], res["ref"]
         if hit and hit["download_url"]:
             resolved += 1
             print(f"RESOLVED  {label}\n"
@@ -438,14 +456,35 @@ def main(argv=None) -> int:
                     entry["duration_s"] = int(ref)
                 if status == "buy_only":  # now resolvable - back into play
                     entry["download_status"] = "missing"
-        elif lookup_failed:
-            continue  # the error line above is the record; not a "no source" verdict
+        elif res["error"]:
+            return  # the error line above is the record; not a "no source" verdict
         else:
             no_source.append(label)
             if args.no_youtube:
                 print(f"NO ARTIST-ENABLED FREE SOURCE  {label}")
             else:
                 print(f"NO ARTIST-ENABLED FREE SOURCE AND NO YOUTUBE MATCH  {label}")
+
+    workers = max(1, min(args.jobs, len(to_do))) if to_do else 1
+    if workers <= 1:
+        for entry in to_do:
+            apply_result(entry, lookup(entry))
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            pending = {}
+            for entry in to_do:
+                time.sleep(random.uniform(0.1, 0.5))  # stagger search starts
+                pending[pool.submit(lookup, entry)] = entry
+            for fut in as_completed(pending):
+                entry = pending[fut]
+                try:
+                    res = fut.result()
+                except SystemExit:
+                    raise
+                except Exception as exc:  # a worker crash is one report line, not the run
+                    res = {"ref": None, "hit": None, "yt_hit": None,
+                           "error": f"{type(exc).__name__}: {exc}", "yt_error": None}
+                apply_result(entry, res)
 
     if not args.dry_run and (resolved or yt_resolved):
         tmp = path.with_name(path.name + ".tmp")  # atomic replace: never corrupt the manifest

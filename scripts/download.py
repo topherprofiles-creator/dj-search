@@ -24,7 +24,7 @@ missing and has a download_url, updating the manifest in place:
 
   python scripts/download.py --manifest "<save>/_dj-search/candidates.json" \
       --have "<save>/_dj-search/have_pc.json" --outdir "<save>" \
-      --confirm-free-download [--browser chrome]
+      --confirm-free-download [--jobs N] [--browser chrome]
 
 Single-URL mode:
 
@@ -38,9 +38,12 @@ import argparse
 import glob as globmod
 import json
 import os
+import random
 import re
 import shutil
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -131,7 +134,7 @@ def normalize_quality(spec: str) -> str:
     return (spec or "").strip().strip("k").strip("K")
 
 
-def download_one(url, outdir: Path, base: str, quality: str, browser):
+def download_one(url, outdir: Path, base: str, quality: str, browser, show_progress: bool = True):
     opts = {
         "format": "bestaudio/best",
         "outtmpl": str(outdir / (base + ".%(ext)s")),
@@ -140,7 +143,7 @@ def download_one(url, outdir: Path, base: str, quality: str, browser):
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
-        "progress_hooks": [progress_hook],
+        "progress_hooks": [progress_hook] if show_progress else [],
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
             "preferredcodec": "mp3",
@@ -158,6 +161,17 @@ def download_one(url, outdir: Path, base: str, quality: str, browser):
         failure = str(exc)   # check below decides, same as the old CLI version.
 
     produced = outdir / (base + ".mp3")
+    if not produced.exists() and re.search(
+            r"HTTP Error 403|timed out|Temporary failure|Connection reset|Read error",
+            failure or ""):
+        time.sleep(4)  # transient by nature - the live run saw a 403 clear on attempt 2
+        try:
+            with YoutubeDL(opts) as ydl:
+                ydl.download([url])
+            failure = None
+        except Exception as exc:
+            failure = str(exc)
+
     if produced.exists():
         return True, produced
     leftovers = [p for p in globmod.glob(str(outdir / (globmod.escape(base) + ".*")))
@@ -190,6 +204,8 @@ def main(argv=None) -> int:
                                       "'chrome:Profile 2' (close Chrome first)")
     ap.add_argument("--no-youtube", action="store_true",
                     help="legal sources only - skip tracks resolved via the YouTube fallback")
+    ap.add_argument("--jobs", type=int, default=6,
+                    help="parallel downloads (default 6; 1 = serial)")
     ap.add_argument("--confirm-free-download", action="store_true",
                     help="confirm each source offers a free/licensed download (SKILL.md step 5)")
     ap.add_argument("--dry-run", action="store_true")
@@ -277,6 +293,10 @@ def main(argv=None) -> int:
 
     ok_count = fail_count = refused = 0
     downloaded, failed_list = [], []
+
+    # Triage + name reservation runs single-threaded, so workers never race on names.
+    run_jobs = []
+    reserved = set()
     for label, url, name, entry in jobs:
         kind = source_kind(url)
         if kind == "youtube" and args.no_youtube:
@@ -292,13 +312,19 @@ def main(argv=None) -> int:
             print(f"WOULD DOWNLOAD  {label}\n  {url}\n  -> {outdir / (sanitize(name) + '.mp3')}")
             continue
         base = unique_base(outdir, sanitize(name))
-        tag = "  (YouTube fallback)" if kind == "youtube" else ""
-        print(f"Downloading{tag}  {label}  <- {url}")
-        ok, result = download_one(url, outdir, base, args.quality, args.browser)
+        n = 2
+        while base in reserved:  # identical labels in one run must not share a name
+            base = f"{sanitize(name)} ({n})"
+            n += 1
+        reserved.add(base)
+        run_jobs.append((label, url, kind, base, entry))
+
+    def finish(label, entry, ok, result):
+        nonlocal ok_count, fail_count
         if ok:
             ok_count += 1
             downloaded.append((label, str(result)))
-            print(f"  ok -> {result}")
+            print(f"  ok -> {label}: {result}")
             if entry is not None:
                 entry["download_status"] = "downloaded"
                 entry["local_path"] = str(result)
@@ -306,12 +332,37 @@ def main(argv=None) -> int:
         else:
             fail_count += 1
             failed_list.append((label, str(result)))
-            print(f"  FAILED: {result}")
+            print(f"  FAILED: {label}: {result}")
             if entry is not None:
                 entry["download_status"] = "failed"
                 entry["error"] = str(result)
-        if entry is not None and manifest_path is not None and not args.dry_run:
+        if entry is not None and manifest_path is not None:
             save_manifest(manifest_path, data)  # keep progress on interrupt
+
+    workers = max(1, min(args.jobs, len(run_jobs))) if run_jobs else 1
+    if workers <= 1:
+        for label, url, kind, base, entry in run_jobs:
+            tag = "  (YouTube fallback)" if kind == "youtube" else ""
+            print(f"Downloading{tag}  {label}  <- {url}")
+            ok, result = download_one(url, outdir, base, args.quality, args.browser)
+            finish(label, entry, ok, result)
+    else:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            pending = {}
+            for label, url, kind, base, entry in run_jobs:
+                time.sleep(random.uniform(0.2, 1.0))  # stagger starts, be polite
+                tag = "  (YouTube fallback)" if kind == "youtube" else ""
+                print(f"Downloading{tag}  {label}  <- {url}")
+                fut = pool.submit(download_one, url, outdir, base, args.quality,
+                                  args.browser, False)
+                pending[fut] = (label, entry)
+            for fut in as_completed(pending):
+                label, entry = pending[fut]
+                try:
+                    ok, result = fut.result()
+                except Exception as exc:  # a worker crash is one failed track, not the run
+                    ok, result = False, f"{type(exc).__name__}: {exc}"
+                finish(label, entry, ok, result)
 
     if manifest_path is not None and data is not None and not args.dry_run:
         save_manifest(manifest_path, data)
