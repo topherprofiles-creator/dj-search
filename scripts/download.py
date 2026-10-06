@@ -143,6 +143,7 @@ def download_one(url, outdir: Path, base: str, quality: str, browser, show_progr
         "quiet": True,
         "no_warnings": True,
         "noprogress": True,
+        "socket_timeout": 30,
         "progress_hooks": [progress_hook] if show_progress else [],
         "postprocessors": [{
             "key": "FFmpegExtractAudio",
