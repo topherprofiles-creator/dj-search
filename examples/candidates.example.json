@@ -1,0 +1,53 @@
+[
+  {
+    "id": "cand-001",
+    "artist": "Example Artist",
+    "title": "Lagos Night Drive",
+    "genre": "Afrobeats",
+    "why_trending": "Apple Music NG Top 100 #12 (+6); Audiomack Trending Afrobeats #4; rising inside 7d window",
+    "release_date": "2026-09-30",
+    "bpm": 104,
+    "key": "8A",
+    "sources": ["Apple Music NG", "Audiomack Trending"],
+    "variant": "clean",
+    "download_status": "missing",
+    "download_url": "",
+    "local_path": "",
+    "recommendation": "Peak-time. 104 BPM — easy mix out of amapiano log drums.",
+    "error": ""
+  },
+  {
+    "id": "cand-002",
+    "artist": "Drive Artist",
+    "title": "Cloud Crate",
+    "genre": "Amapiano",
+    "why_trending": "Spotify NG Viral 50 #9; TikTok sounds breakout",
+    "release_date": "2026-10-01",
+    "bpm": 112,
+    "key": "5B",
+    "sources": ["Spotify NG Viral 50", "TikTok sounds"],
+    "variant": "",
+    "download_status": "missing",
+    "download_url": "",
+    "local_path": "",
+    "recommendation": "Opener / warm-up — the log-drum intro is a clean blend point.",
+    "error": ""
+  },
+  {
+    "id": "cand-003",
+    "artist": "Missing One",
+    "title": "Nowhere Tune",
+    "genre": "Gen-Z TikTok",
+    "why_trending": "Shazam NG Top 200 #31 (new entry)",
+    "release_date": "2026-10-02",
+    "bpm": null,
+    "key": null,
+    "sources": ["Shazam NG"],
+    "variant": "dirty",
+    "download_status": "missing",
+    "download_url": "",
+    "local_path": "",
+    "recommendation": "Short edit — drop the first chorus straight after the kick.",
+    "error": ""
+  }
+]
