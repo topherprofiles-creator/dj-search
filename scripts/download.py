@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import glob as globmod
 import json
+import os
 import re
 import shutil
 import sys
@@ -57,7 +58,7 @@ def host_allowed(url: str) -> bool:
 def sanitize(name: str) -> str:
     name = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "-", name or "")
     name = re.sub(r"\s+", " ", name).strip(" .")
-    return name or "track"
+    return name[:120].rstrip(" .") or "track"  # Windows component limit headroom
 
 
 def _taken(outdir: Path, base: str) -> bool:
@@ -84,6 +85,13 @@ def print_skipped(skipped: dict) -> None:
         if items:
             names = ", ".join(items[:8]) + (" …" if len(items) > 8 else "")
             print(f"  {reason}: {len(items)} — {names}")
+
+
+def save_manifest(manifest_path: Path, data) -> None:
+    """Atomic replace - a crash mid-write never corrupts the shared manifest."""
+    tmp = manifest_path.with_name(manifest_path.name + ".tmp")
+    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    os.replace(tmp, manifest_path)
 
 
 def progress_hook(status: dict) -> None:
@@ -146,8 +154,17 @@ def download_one(url, outdir: Path, base: str, quality: str, browser):
         return True, produced
     leftovers = [p for p in globmod.glob(str(outdir / (globmod.escape(base) + ".*")))
                  if not p.lower().endswith(".mp3")]
-    if leftovers:
-        return False, f"postprocessing failed (is ffmpeg on PATH?) - leftover {Path(leftovers[0]).name}"
+    parts = [p for p in leftovers if p.lower().endswith((".part", ".ytdl"))]
+    for p in parts:  # a half-fetched file must not poison the next run's names
+        try:
+            Path(p).unlink()
+        except OSError:
+            pass
+    real = [p for p in leftovers if p not in parts]
+    if parts and not real:
+        return False, "download interrupted (partial file cleaned up - rerun with --retry-failed to retry)"
+    if real:
+        return False, f"postprocessing failed (is ffmpeg on PATH?) - leftover {Path(real[0]).name}"
     err = (failure or "").strip().splitlines()
     return False, (err[-1][:200] if err else "download failed (no file produced)")
 
@@ -178,7 +195,7 @@ def main(argv=None) -> int:
             "Only fetch tracks whose page actually offers a free/licensed download\n"
             "(SoundCloud Free Download / Bandcamp / promo gate) - see SKILL.md.")
 
-    outdir = Path(args.outdir)
+    outdir = Path(args.outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
 
     if not args.dry_run:
@@ -194,30 +211,37 @@ def main(argv=None) -> int:
     skipped = {
         "owned (already on PC/Drive)": [],
         "already downloaded": [],
+        "promo (gate handed to the DJ)": [],
         "buy_only (no legal free source)": [],
         "failed earlier (not retried)": [],
         "no download_url resolved": [],
     }
     if args.manifest:
         manifest_path = Path(args.manifest)
-        data = json.loads(manifest_path.read_text(encoding="utf-8"))
+        data = json.loads(manifest_path.read_text(encoding="utf-8-sig"))
         if not isinstance(data, list):
             raise SystemExit("manifest must be a candidates.json array")
         owned_ids = set()
         if args.have and Path(args.have).exists():
-            have = json.loads(Path(args.have).read_text(encoding="utf-8"))
-            owned_ids = {r.get("id") for r in have.get("results", []) if r.get("owned")}
+            have = json.loads(Path(args.have).read_text(encoding="utf-8-sig"))
+            owned_ids = {str(r.get("id")) for r in have.get("results", []) if r.get("owned")}
         for entry in data:
             if not isinstance(entry, dict):
                 continue
             label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
             status = (entry.get("download_status") or "missing").strip().lower()
-            if entry.get("id") in owned_ids or status == "owned":
+            if str(entry.get("id")) in owned_ids or status == "owned":
                 skipped["owned (already on PC/Drive)"].append(label)
                 continue
-            if status in ("downloaded", "buy_only"):
-                skipped[{"downloaded": "already downloaded",
-                         "buy_only": "buy_only (no legal free source)"}[status]].append(label)
+            local = (entry.get("local_path") or "").strip()
+            if status == "downloaded" or (local and Path(local).exists()):
+                skipped["already downloaded"].append(label)
+                continue
+            if status == "promo":
+                skipped["promo (gate handed to the DJ)"].append(label)
+                continue
+            if status == "buy_only":
+                skipped["buy_only (no legal free source)"].append(label)
                 continue
             if status == "failed" and not args.retry_failed:
                 skipped["failed earlier (not retried)"].append(label)
@@ -270,10 +294,11 @@ def main(argv=None) -> int:
             if entry is not None:
                 entry["download_status"] = "failed"
                 entry["error"] = str(result)
+        if entry is not None and manifest_path is not None and not args.dry_run:
+            save_manifest(manifest_path, data)  # keep progress on interrupt
 
     if manifest_path is not None and data is not None and not args.dry_run:
-        manifest_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-                                 encoding="utf-8")
+        save_manifest(manifest_path, data)
         print(f"Updated {manifest_path}")
 
     if not args.dry_run:
@@ -287,7 +312,7 @@ def main(argv=None) -> int:
                 print(f"  {label}: {err}")
         print(f"Done: {ok_count} downloaded, {fail_count} failed, {refused} refused.")
         print_skipped(skipped)
-    return 0
+    return 1 if fail_count else 0
 
 
 if __name__ == "__main__":

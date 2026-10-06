@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -127,6 +128,9 @@ def search_tracks(client_id: str, query: str, limit: int = 30) -> list:
             raise SystemExit("SoundCloud rejected the client_id (HTTP %d). The script refetches "
                              "it every run - try again; if it persists SoundCloud changed something."
                              % exc.code)
+        if exc.code == 429:  # rate limited - one polite retry after a pause
+            time.sleep(5)
+            return json.loads(http_get(url).decode("utf-8", "replace")).get("collection", [])
         raise
 
 
@@ -174,14 +178,14 @@ def main(argv=None) -> int:
         return 0
 
     path = Path(args.candidates)
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = json.loads(path.read_text(encoding="utf-8-sig"))
     if not isinstance(data, list):
         raise SystemExit("candidates must be a JSON array")
 
     owned_ids = set()
     if args.have and Path(args.have).exists():
-        have = json.loads(Path(args.have).read_text(encoding="utf-8"))
-        owned_ids = {r.get("id") for r in have.get("results", []) if r.get("owned")}
+        have = json.loads(Path(args.have).read_text(encoding="utf-8-sig"))
+        owned_ids = {str(r.get("id")) for r in have.get("results", []) if r.get("owned")}
 
     resolved = skipped = lookups = 0
     no_source = []
@@ -190,21 +194,26 @@ def main(argv=None) -> int:
             continue
         label = f"{entry.get('artist', '')} - {entry.get('title', '')}".strip(" -")
         status = (entry.get("download_status") or "missing").strip().lower()
-        if (entry.get("id") in owned_ids or status in ("owned", "downloaded", "buy_only")
+        if (str(entry.get("id")) in owned_ids or status in ("owned", "downloaded", "promo", "buy_only")
                 or (entry.get("download_url") or "").strip()):
             skipped += 1
             continue
         if args.max is not None and lookups >= args.max:
             break
         lookups += 1
+        failed_lookup = False
         try:
             hit = resolve_one(client_id, entry.get("artist", ""), entry.get("title", ""))
         except SystemExit:
             raise
         except Exception as exc:
             print(f"ERROR  {label}: {type(exc).__name__}: {exc}")
+            failed_lookup = True
+            hit = None
+        finally:
+            time.sleep(0.6)  # stay polite with the API, even after errors
+        if failed_lookup:
             continue
-        time.sleep(0.6)  # stay polite with the API
         if not hit or not hit["download_url"]:
             no_source.append(label)
             print(f"NO ARTIST-ENABLED FREE SOURCE  {label}")
@@ -219,8 +228,9 @@ def main(argv=None) -> int:
             entry["download_source"] = f"soundcloud:{hit['uploader']}"
 
     if not args.dry_run and resolved:
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n",
-                        encoding="utf-8")
+        tmp = path.with_name(path.name + ".tmp")  # atomic replace: never corrupt the manifest
+        tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        os.replace(tmp, path)
         print(f"Updated {path}")
 
     print(f"Done: {resolved} resolved, {skipped} skipped (already handled), "

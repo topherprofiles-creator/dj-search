@@ -315,8 +315,12 @@ def scan_roots(roots) -> list:
             print(f"  ! drive/folder not ready or not found, skipping: {root}", file=sys.stderr)
             continue
         for dirpath, dirnames, filenames in os.walk(rp):
-            dirnames[:] = [d for d in dirnames
-                           if d.lower() not in PRUNE_DIRS and not d.startswith(".")]
+            dirnames[:] = [
+                d for d in dirnames
+                if d.lower() not in PRUNE_DIRS and not d.startswith(".")
+                # junctions (C:\Documents and Settings -> Users, ...) duplicate whole trees
+                and not (hasattr(os.path, "isjunction") and os.path.isjunction(os.path.join(dirpath, d)))
+            ]
             for fn in filenames:
                 if Path(fn).suffix.lower() in AUDIO_EXTS:
                     full = os.path.join(dirpath, fn)
@@ -352,7 +356,7 @@ def discover_drives() -> list:
 
 
 def load_drive_listing(path: str) -> list:
-    lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
+    lines = Path(path).read_text(encoding="utf-8-sig", errors="replace").splitlines()
     out, seen = [], set()
     for line in lines:
         line = line.strip()
@@ -433,7 +437,7 @@ def best_match(cand: dict, records, index, soft_threshold: float):
 # --------------------------------------------------------------------------- main
 
 def load_candidates(path: str) -> list:
-    data = json.loads(Path(path).read_text(encoding="utf-8"))
+    data = json.loads(Path(path).read_text(encoding="utf-8-sig"))  # tolerate BOM (PowerShell)
     if isinstance(data, dict) and "candidates" in data:
         data = data["candidates"]
     if not isinstance(data, list):

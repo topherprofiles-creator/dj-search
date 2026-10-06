@@ -33,7 +33,7 @@ CSV_COLUMNS = ["Rank", "Artist", "Title", "Genre", "BPM", "Key", "Release Date",
 
 
 def load_json(path: Path):
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))  # tolerate BOM'd files (PowerShell)
 
 
 def key_of(artist, title) -> str:
@@ -44,7 +44,7 @@ def status_of(cand: dict, have_rec) -> str:
     if have_rec and have_rec.get("owned"):
         return "owned"
     ds = (cand.get("download_status") or "").strip().lower()
-    if ds in ("downloaded", "buy_only", "failed"):
+    if ds in ("downloaded", "promo", "buy_only", "failed"):
         return ds
     local = (cand.get("local_path") or "").strip()
     if local and Path(local).exists():
@@ -76,28 +76,31 @@ def main(argv=None) -> int:
     have_list, have_by_id, have_by_key = [], {}, {}
     if args.have and Path(args.have).exists():
         have_list = load_json(Path(args.have)).get("results", [])
-        have_by_id = {r.get("id"): r for r in have_list}
+        have_by_id = {str(r.get("id")): r for r in have_list}
         have_by_key = {key_of(r.get("artist", ""), r.get("title", "")): r for r in have_list}
 
     rows = []
     for i, cand in enumerate(candidates, 1):
         if not isinstance(cand, dict):
             continue
-        have_rec = (have_by_id.get(cand.get("id"))
+        have_rec = (have_by_id.get(str(cand.get("id")))
                     or have_by_key.get(key_of(cand.get("artist", ""), cand.get("title", ""))))
         if have_rec is None and have_list and len(have_list) == len(candidates):
             have_rec = have_list[i - 1]
         owned = bool(have_rec and have_rec.get("owned"))
         local = (cand.get("local_path") or "").strip()
         if not local and have_rec:
-            local = (have_rec.get("match_path") or have_rec.get("drive_path") or "")
+            local = have_rec.get("match_path") or ""
+            if not local:
+                dp = have_rec.get("drive_path") or ""
+                local = dp if dp and Path(dp).is_absolute() else ""  # listing paths are not local files
         rows.append({
             "rank": i,
             "artist": cand.get("artist", ""),
             "title": cand.get("title", ""),
             "genre": cand.get("genre", ""),
             "bpm": cand.get("bpm") if cand.get("bpm") else "",
-            "key": cand.get("key", "") or "",
+            "key": str(cand.get("key", "") or ""),
             "release_date": cand.get("release_date", ""),
             "why": cand.get("why_trending", ""),
             "owned": "yes" if owned else "no",
@@ -132,7 +135,7 @@ def main(argv=None) -> int:
             fh.write(path.replace("\\", "/") + "\n")
 
     if not args.quiet:
-        counts = {"downloaded": 0, "owned": 0, "buy_only": 0, "failed": 0, "missing": 0}
+        counts = {"downloaded": 0, "owned": 0, "promo": 0, "buy_only": 0, "failed": 0, "missing": 0}
         pc = dr = 0
         for r in rows:
             if r["status"] in counts:
@@ -141,7 +144,8 @@ def main(argv=None) -> int:
                 pc += int("pc" in r["owned_from"])
                 dr += int("drive" in r["owned_from"])
         print(f"Owned: {counts['owned']} (PC {pc} / Drive {dr})"
-              f"   Downloaded: {counts['downloaded']}   Buy-only: {counts['buy_only']}"
+              f"   Downloaded: {counts['downloaded']}   Promo: {counts['promo']}"
+              f"   Buy-only: {counts['buy_only']}"
               f"   Failed: {counts['failed']}   Missing: {counts['missing']}")
         print(f"Playlist: {len(playlist)} playable file(s)"
               f"{f', {skipped} owned/downloaded without a local file (cloud or moved)' if skipped else ''}.")

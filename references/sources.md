@@ -7,7 +7,7 @@ from them. **Download** sources are where a track is actually offered for free/l
 
 ## Discovery sources (read only — never download from these)
 
-Read each in the owner's live Chrome. Intersect them: a track on 2+ lists inside the window is a
+Read each in the already-open live Chrome. Intersect them: a track on 2+ lists inside the window is a
 real trend, not one platform's quirk.
 
 | Source | URL | How to read it |

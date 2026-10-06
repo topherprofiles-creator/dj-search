@@ -32,9 +32,9 @@ Only when the answers are in hand does step 2 begin.
 
 ### 2. Discover what's trending (browser + web search — discovery only)
 
-Use the owner's live Chrome via chrome-devtools (`--autoConnect`; never kill/relaunch/copy it — see
-`use-live-chrome`). Pull from several charts and intersect, so you get what is *actually* moving, not
-one site's bias. Sources and exact reading tips are in `references/sources.md`. In short:
+Use the user's already-running Chrome via chrome-devtools (`--autoConnect`) — never close, kill,
+relaunch or copy the browser profile. Pull from several charts and intersect, so you get what is
+*actually* moving, not one site's bias. Sources and exact reading tips are in `references/sources.md`. In short:
 
 - TurnTable Charts (Nigeria's official chart), Apple Music NG Top 100, Spotify NG Top 50 + Viral 50,
   Audiomack Trending (Afrobeats / Amapiano), Boomplay NG, Shazam NG Top 200, TikTok trending sounds.
@@ -44,8 +44,9 @@ one site's bias. Sources and exact reading tips are in `references/sources.md`. 
 Produce a candidate list: `id` (`cand-001`…), `artist`, `title`, `genre`, `why_trending` (which
 charts, rising/new), `release_date` (ISO `YYYY-MM-DD`), `bpm`/`key` when a source gives them,
 `sources`, and `variant` (`clean`/`dirty`/empty). Later steps fill in `download_status` (`missing` →
-`downloaded`/`buy_only`/`failed`), `download_url`, `local_path`, `recommendation`, `error`. Write it
-to `<save_path>/_dj-search/candidates.json`.
+`downloaded`/`promo`/`buy_only`/`failed`), `download_url`, `download_source` (set by the resolver,
+e.g. `soundcloud:<uploader>`), `local_path`, `recommendation`, `error`. Write it to
+`<save_path>/_dj-search/candidates.json`.
 
 ### 3. Check what you already own — the whole PC first
 
@@ -91,7 +92,8 @@ often carry legit Free Download links. Recipes: `references/sources.md`.
 Every missing track must finish as exactly one of:
 
 - **downloaded** — fetched from an artist-enabled free source (best outcome)
-- **promo** — an official artist/label promo link was found; the DJ completes the gate
+- **promo** — an official artist/label promo link was found; set `download_status: "promo"` and put
+  the gate link in `download_url` (no file is fetched — the DJ completes the gate)
 - **buy_only** — no free, artist-enabled source exists anywhere; list it in the report with this
   status and move on. This skill **never** pushes payments and never carries store links.
 
@@ -106,9 +108,6 @@ isn't artist-enabled or licensed, the finish line is: listed as `buy_only` in th
 more. Summary:
 
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
-- SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it. Audiomack
-  has no web downloads anymore — only follow a download link the artist themselves posted. Files land
-  in the browser's Downloads folder; the skill then moves+renames them.
 - `scripts/resolve_sources.py` auto-resolves download URLs first: it searches SoundCloud and writes a
   `download_url` into candidates.json only when the uploader account itself looks like the artist and
   the track's free download is enabled (the API's `downloadable` flag) — run it after the scan/Drive
@@ -120,6 +119,10 @@ more. Summary:
   (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
   Its final report lists every track **downloaded** (with path) and everything **skipped** (owned /
   buy_only / no source found) — relay both to the DJ.
+- What the two scripts could not get, hunt by hand: SoundCloud/Bandcamp artist profiles and official
+  promo gates. Confirm a real Download/Free affordance before using it (Audiomack has no web downloads
+  anymore — only follow a download link the artist themselves posted). Files land in the browser's
+  Downloads folder; then move+rename them into `<save_path>`.
 - Name every file `Artist - Title (Clean).mp3` / `(Dirty).mp3`, 320 kbps where the source allows,
   written straight into `<save_path>`.
 - If no legal free source exists: mark the track `buy_only` and list it in the final report. Never
@@ -138,7 +141,8 @@ Close with a short, opinionated read — this is the part a DJ actually wants:
 ### 7. Save the crate + report
 
 - Write `scripts/write_crate.py` output: `<save_path>/_dj-search/crate_<window>d_<date>.csv` and `.m3u8`
-  (playlist of the downloaded files, import-ready into Serato/rekordbox/Engine).
+  (the .m3u8 holds every track with a real local file — downloaded here or already on the PC —
+  import-ready into Serato/rekordbox/Engine).
 - Print a compact table: downloaded / already-owned (PC vs Drive) / buy-only / failed, plus the
   recommendations. Then stop.
 
@@ -146,6 +150,6 @@ Close with a short, opinionated read — this is the part a DJ actually wants:
 
 - or piracy sites. Discovery only.
 - Never enter the DJ's passwords or solve captchas for them — pause and ask them to log in.
-- Never kill, relaunch or copy Chrome (`use-live-chrome`).
+- Never close, kill, relaunch or copy the user's Chrome — work in the browser that is already open.
 - Never overwrite an existing file in the save path without renaming (` (2)`); never delete library files.
 - Never let one unavailable track abort the run.
