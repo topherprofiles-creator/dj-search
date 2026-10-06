@@ -12,7 +12,7 @@ Type `/dj-search` in Claude Code and the skill:
 2. **Discovers** what's moving — reads TurnTable Charts, Apple Music NG, Spotify NG + Viral, Audiomack, Boomplay, Shazam NG and TikTok trending sounds in your live Chrome, intersects the charts, and keeps only entries moving inside your window.
 3. **Scans your PC** — `scripts/scan_library.py` walks your **entire PC and every plugged-in flash/removable drive** (`--all-drives`; system folders are pruned automatically), reads ID3v2/ID3v1, MP4/M4A atoms and FLAC tags offline (zero dependencies), and fuzzy-matches every candidate against what's there.
 4. **Checks Google Drive** — mounted Drive letter, an `rclone` listing, or a browser search — so you never re-download what's already in the cloud.
-5. **Downloads what's missing** from legal free sources only: Audiomack (artist-enabled), SoundCloud (Free Download), Bandcamp, artist/label promo gates, or your own DJ pool.
+5. **Downloads what's missing** — auto-resolves artist-enabled SoundCloud free downloads (`resolve_sources.py`), then fetches from Audiomack (artist-enabled), SoundCloud (Free Download), Bandcamp, artist/label promo gates, or your own DJ pool; anything with no legal free source ends as `buy_only`, never silently dropped.
 6. **Recommends like a DJ** — crate picks, rising vs. peaked, BPM/key groupings, harmonic-pair flags.
 7. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / Engine.
 
@@ -72,6 +72,7 @@ dj-search/
 ├─ SKILL.md                     the skill itself (Claude Code entry point)
 ├─ scripts/
 │  ├─ scan_library.py           offline tag reader + fuzzy de-dup (zero deps)
+│  ├─ resolve_sources.py        artist-enabled SoundCloud download resolver (zero deps)
 │  ├─ download.py               legal-source downloader (yt-dlp library, allowlisted)
 │  └─ write_crate.py            ranked CSV + M3U8 writer
 ├─ references/

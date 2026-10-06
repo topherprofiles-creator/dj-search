@@ -110,14 +110,19 @@ For each missing track, resolve a **legal** download URL and fetch it. Check the
 profile (not just site search), and hunt official promo gates — artist Linktree/bios/social posts
 often carry legit Free Download links. Recipes: `references/sources.md`.
 
-**Absolute rule — no track ends unresolved.** Every missing track must finish as exactly one of:
+**Absolute rule — no track ends unresolved (the streak rule: keep going until it's downloaded).**
+Every missing track must finish as exactly one of:
 
 - **downloaded** — fetched from an artist-enabled free source (best outcome)
 - **promo** — an official artist/label promo link was found; the DJ completes the gate
 - **buy_only** — no free, artist-enabled source exists anywhere; list it in the report with this
   status and move on. This skill **never** pushes payments and never carries store links.
 
-Never silently drop a track, and never widen the source list to piracy: **no 9jaflavour-style leech
+Never silently drop a track. Keep looping **resolve → download → retry** until every track lands in
+one of those buckets: on reruns pass `--retry-failed` to `download.py` so previously failed tracks get
+another shot through every legal channel. `buy_only` is a resolved end state, not a miss — when no
+artist-enabled source exists, the loop has done everything it legitimately can. And it never widens
+the source list to piracy: **no 9jaflavour-style leech
 blogs, no "free mp3" sites from Google results, no YouTube/streaming rips.** Those distribute these
 same songs without a license — repo-ban and legal-risk territory, not a download strategy. If it
 isn't artist-enabled or licensed, the finish line is: listed as `buy_only` in the report. Nothing
@@ -126,6 +131,11 @@ more. Summary:
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
 - Audiomack/SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it.
   Files land in the browser's Downloads folder; the skill then moves+renames them.
+- `scripts/resolve_sources.py` auto-resolves download URLs first: it searches SoundCloud and writes a
+  `download_url` into candidates.json only when the uploader account itself looks like the artist and
+  the track's free download is enabled (the API's `downloadable` flag) — run it after the scan/Drive
+  steps so fewer tracks end as `buy_only`:
+  `python scripts/resolve_sources.py --candidates "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json"`
 - `scripts/download.py` drives the `yt-dlp` library in-process for sources that *offer* a free download (SoundCloud/Bandcamp
   free links, Audiomack). It is **not** for streaming/paywalled rips — see the legal line. Run it as
   `python scripts/download.py --manifest "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json" --outdir "<save_path>" --confirm-free-download`

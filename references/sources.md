@@ -57,6 +57,12 @@ Resolve each missing track to the first of these that has it. Stop at the first 
 - BPM Supreme, DJcity, ZIPDJ, DigitalDJPool, Beatport. The DJ must already be logged in. These give
   proper clean/dirty/intro edits — best quality for actual sets.
 
+### The resolver
+`scripts/resolve_sources.py` searches SoundCloud for each still-missing track and writes a `download_url`
+into candidates.json only when the uploader account itself looks like the artist and the track's free
+download is enabled (API `downloadable` flag). Fan re-uploads of label songs are rejected by the uploader
+guard. Run it before the downloader so fewer tracks end as `buy_only` — it never widens the source list.
+
 ### The downloader script
 `scripts/download.py` drives the `yt-dlp` library (in-process) and is for the sources above that **offer** a free download
 (SoundCloud free links, Bandcamp, Audiomack downloadable tracks). It extracts best audio and

@@ -162,6 +162,8 @@ def main(argv=None) -> int:
     ap.add_argument("--confirm-free-download", action="store_true",
                     help="confirm each source offers a free/licensed download (SKILL.md step 5)")
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument("--retry-failed", action="store_true",
+                    help="re-attempt candidates previously marked failed (no-track-left-behind loop)")
     args = ap.parse_args(argv)
 
     if not args.manifest and not args.urls:
@@ -209,10 +211,12 @@ def main(argv=None) -> int:
             if entry.get("id") in owned_ids or status == "owned":
                 skipped["owned (already on PC/Drive)"].append(label)
                 continue
-            if status in ("downloaded", "buy_only", "failed"):
+            if status in ("downloaded", "buy_only"):
                 skipped[{"downloaded": "already downloaded",
-                         "buy_only": "buy_only (no legal free source)",
-                         "failed": "failed earlier (not retried)"}[status]].append(label)
+                         "buy_only": "buy_only (no legal free source)"}[status]].append(label)
+                continue
+            if status == "failed" and not args.retry_failed:
+                skipped["failed earlier (not retried)"].append(label)
                 continue
             url = (entry.get("download_url") or "").strip()
             if not url:
