@@ -26,7 +26,7 @@ This repo only downloads tracks that are offered for **free download** or that *
 - Official artist/label promo gates (Linktree, Hypeddit, ToneDen)
 - Your own paid pool subscriptions (BPM Supreme, DJcity, ZIPDJ, …)
 
-It will **never** rip YouTube, Spotify, Apple Music or Boomplay, and never touches piracy sites — those are used for *discovery only*. `scripts/download.py` enforces this: any URL whose host isn't on its allowlist is refused.
+It will **never** rip YouTube, Spotify, Apple Music or Boomplay, and never touches piracy sites — including 9jaflavour-style "free MP3" leech blogs — those are used for *discovery only*. `scripts/download.py` enforces this: any URL whose host isn't on its allowlist is refused. And **no track ends unresolved**: everything that can't be downloaded legally gets an exact buy link filled by `scripts/find_buy_links.py`.
 
 ## Requirements
 

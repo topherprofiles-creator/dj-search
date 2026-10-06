@@ -29,6 +29,11 @@ download source. When the only place a track exists is streaming/paywalled, say 
 DJ at where to buy or pull it — do not download it. If the user explicitly asks to rip a
 streaming-only track, decline that track and offer the legal alternative; keep doing the rest.
 
+Leech/aggregator sites are on the wrong side of that same line: **never** use 9jaflavour-style
+"free MP3" blogs or Google-result download sites, even when a track is unfindable elsewhere. They
+redistribute these exact songs without a license — using them risks the repo and the DJ, not just
+the site.
+
 ## The run, in order
 
 ### 1. STOP — ask first (strict rule, no exceptions)
@@ -101,8 +106,20 @@ Merge PC + Drive into one `owned` set. Only genuinely-missing tracks go to step 
 
 ### 5. Download the missing ones — legal sources only
 
-For each missing track, resolve a **legal** download URL (section order above) and fetch it.
-See `references/sources.md` for the per-source recipe. Summary:
+For each missing track, resolve a **legal** download URL and fetch it. Check the artist's own
+profile (not just site search), and hunt official promo gates — artist Linktree/bios/social posts
+often carry legit Free Download links. Recipes: `references/sources.md`.
+
+**Absolute rule — no track ends unresolved.** Every missing track must finish as exactly one of:
+
+- **downloaded** — fetched from an artist-enabled free source (best outcome)
+- **promo** — an official artist/label promo link was found; the DJ completes the gate
+- **buy_only** — no free source exists, but an exact store link is filled (one-click buy)
+
+Never silently drop a track, and never widen the source list to piracy: **no 9jaflavour-style leech
+blogs, no "free mp3" sites from Google results, no YouTube/streaming rips.** Those distribute these
+same songs without a license — repo-ban and legal-risk territory, not a download strategy. If it
+isn't artist-enabled or licensed, the finish line is the buy link. Summary:
 
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
 - Audiomack/SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it.
@@ -113,10 +130,14 @@ See `references/sources.md` for the per-source recipe. Summary:
   (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
   Its final report lists every track **downloaded** (with path) and everything **skipped** (owned /
   buy_only / no source found) — relay both to the DJ.
+- `scripts/find_buy_links.py` fills a one-click store link for every track that ends `buy_only`, so
+  the DJ has a purchase path for everything not legally downloadable.
 - Name every file `Artist - Title (Clean).mp3` / `(Dirty).mp3`, 320 kbps where the source allows,
   written straight into `<save_path>`.
-- If no legal free source exists, mark the track `buy_only` with where to get it (pool/Beatport/iTunes)
-  and move on. Never fail the whole run over one track.
+- If no legal free source exists: run `scripts/find_buy_links.py --candidates
+  "<save_path>/_dj-search/candidates.json"` — it fills the exact Apple Music/store link per track
+  (public iTunes Search API, no key) — set `buy_only`, and move on. Never fail the whole run over
+  one track, and never leave one unresolved either.
 
 ### 6. Recommend like a DJ, not a database
 

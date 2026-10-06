@@ -63,6 +63,22 @@ Resolve each missing track to the first of these that has it. Stop at the first 
 transcodes to MP3 320. It must **not** be pointed at YouTube/Spotify/Apple/Boomplay or any
 stream-only URL — that is the line in SKILL.md.
 
+### 6. Official promo gates (the legal "free" downloads that actually exist)
+- Check the artist's own links first: X/IG bio → Linktree/Beacons → Hypeddit/ToneDen/newsletter drops.
+  Search patterns: `"<artist> <title>" linktree`, `<artist> promo download`, the artist's pinned post.
+- These are artist-sanctioned free downloads; complete the follow/email gate only if the DJ is OK
+  with it, otherwise skip.
+- SoundCloud and Audiomack: check the **artist's profile**, not only site search — search misses
+  many street/indie uploads.
+
+### 7. Buy links (when nothing free exists anywhere)
+- `scripts/find_buy_links.py` fills the exact Apple Music store URL per track (public iTunes Search
+  API, `country=ng`).
+- Also point the DJ at Boomplay, or their pools (BPM Supreme/DJcity rarely carry NG street).
+
+**Never:** 9jaflavour/naijaloaded-style leech blogs, generic "free mp3 download" Google results, or
+YouTube/Spotify rips. If it is not artist-enabled, licensed, or a store purchase — it is off-limits.
+
 ---
 
 ## Google Drive de-dup
