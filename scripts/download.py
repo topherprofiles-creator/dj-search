@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
-"""download.py - legal free-download fetcher for dj-search (yt-dlp library).
+"""download.py - download fetcher for dj-search (yt-dlp library).
 
-Only for sources that actually offer the track for free or under the DJ's own
-license: SoundCloud (Free Download enabled) and Bandcamp (free /
-name-your-price). Every other host is refused - YouTube, Spotify, Apple Music,
-Boomplay, Audiomack and piracy sites are discovery-only (see the legal line in
-SKILL.md). The allowlist below is enforced per URL.
+Fetches what the resolver wrote: artist-enabled free sources first - SoundCloud
+(Free Download enabled), Bandcamp (free / name-your-price) - plus, when the
+resolver matched one, a YouTube fallback URL (download_source "youtube:<channel>";
+matching rules in resolve_sources.py and SKILL.md step 5). Every other host is
+still refused - Spotify, Apple Music, Boomplay, Audiomack, leech sites. The
+allowlist below is enforced per URL; --no-youtube switches back to
+legal-sources-only.
 
 Audiomack was dropped from the allowlist 2026-10: its web player no longer
 offers per-song downloads at all (downloads moved to the mobile app / Plus) and
@@ -47,12 +49,18 @@ try:
 except ImportError:  # reported as an install hint in main()
     YoutubeDL = None
 
-ALLOWED_HOSTS = ("soundcloud.com", "bandcamp.com")
+LEGAL_HOSTS = ("soundcloud.com", "bandcamp.com")
+YOUTUBE_HOSTS = ("youtube.com", "youtu.be", "music.youtube.com")
 
 
-def host_allowed(url: str) -> bool:
+def source_kind(url: str) -> str:
+    """Classify a URL: 'legal' (artist-enabled free-download sources), 'youtube'
+    (the resolver's matched fallback), or '' for everything else (refused)."""
     host = (urlparse(url).hostname or "").lower()
-    return any(host == h or host.endswith("." + h) for h in ALLOWED_HOSTS)
+    for kind, hosts in (("legal", LEGAL_HOSTS), ("youtube", YOUTUBE_HOSTS)):
+        if any(host == h or host.endswith("." + h) for h in hosts):
+            return kind
+    return ""
 
 
 def sanitize(name: str) -> str:
@@ -180,6 +188,8 @@ def main(argv=None) -> int:
     ap.add_argument("--quality", default="320K", help="MP3 bitrate for the transcode (default 320K)")
     ap.add_argument("--browser", help="load cookies from this browser, e.g. chrome or "
                                       "'chrome:Profile 2' (close Chrome first)")
+    ap.add_argument("--no-youtube", action="store_true",
+                    help="legal sources only - skip tracks resolved via the YouTube fallback")
     ap.add_argument("--confirm-free-download", action="store_true",
                     help="confirm each source offers a free/licensed download (SKILL.md step 5)")
     ap.add_argument("--dry-run", action="store_true")
@@ -192,8 +202,8 @@ def main(argv=None) -> int:
     if not args.dry_run and not args.confirm_free_download:
         raise SystemExit(
             "Refusing to download without --confirm-free-download.\n"
-            "Only fetch tracks whose page actually offers a free/licensed download\n"
-            "(SoundCloud Free Download / Bandcamp / promo gate) - see SKILL.md.")
+            "Confirm the sources first - artist-enabled free downloads, or the\n"
+            "matched YouTube fallback the resolver wrote (SKILL.md step 5).")
 
     outdir = Path(args.outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)
@@ -215,6 +225,7 @@ def main(argv=None) -> int:
         "buy_only (no legal free source)": [],
         "failed earlier (not retried)": [],
         "no download_url resolved": [],
+        "youtube fallback disabled (--no-youtube)": [],
     }
     if args.manifest:
         manifest_path = Path(args.manifest)
@@ -267,17 +278,22 @@ def main(argv=None) -> int:
     ok_count = fail_count = refused = 0
     downloaded, failed_list = [], []
     for label, url, name, entry in jobs:
-        if not host_allowed(url):
+        kind = source_kind(url)
+        if kind == "youtube" and args.no_youtube:
+            skipped["youtube fallback disabled (--no-youtube)"].append(label)
+            continue
+        if not kind:
             host = urlparse(url).hostname or url
-            print(f"REFUSED  {label}: {host} is not a legal free-download source "
-                  f"(allowed: {', '.join(ALLOWED_HOSTS)}) - see SKILL.md legal line.")
+            print(f"REFUSED  {label}: {host} is not an allowed source "
+                  f"(free: {', '.join(LEGAL_HOSTS)}; fallback: matched YouTube) - see SKILL.md.")
             refused += 1
             continue
         if args.dry_run:
             print(f"WOULD DOWNLOAD  {label}\n  {url}\n  -> {outdir / (sanitize(name) + '.mp3')}")
             continue
         base = unique_base(outdir, sanitize(name))
-        print(f"Downloading  {label}  <- {url}")
+        tag = "  (YouTube fallback)" if kind == "youtube" else ""
+        print(f"Downloading{tag}  {label}  <- {url}")
         ok, result = download_one(url, outdir, base, args.quality, args.browser)
         if ok:
             ok_count += 1
@@ -311,7 +327,7 @@ def main(argv=None) -> int:
             for label, err in failed_list:
                 print(f"  {label}: {err}")
         print(f"Done: {ok_count} downloaded, {fail_count} failed, {refused} refused.")
-        print_skipped(skipped)
+    print_skipped(skipped)  # dry-runs report skips too - nothing may go unsaid
     return 1 if fail_count else 0
 
 

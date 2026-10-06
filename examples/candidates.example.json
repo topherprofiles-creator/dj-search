@@ -45,7 +45,10 @@
     "sources": ["Shazam NG"],
     "variant": "dirty",
     "download_status": "missing",
-    "download_url": "",
+    "download_url": "https://www.youtube.com/watch?v=XXXXXXXXXXX",
+    "download_source": "youtube:Missing One - Topic",
+    "match_confidence": "high",
+    "duration_s": 201,
     "local_path": "",
     "recommendation": "Short edit — drop the first chorus straight after the kick.",
     "error": ""

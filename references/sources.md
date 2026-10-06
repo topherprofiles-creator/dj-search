@@ -1,4 +1,4 @@
-# Sources — discovery (read-only) and downloads (legal only)
+# Sources — discovery (read-only) and downloads (free sources first, YouTube fallback last)
 
 Two separate lists. **Discovery** sources are where you *see* what is trending — you never download
 from them. **Download** sources are where a track is actually offered for free/licensed download.
@@ -29,9 +29,9 @@ Reading tips:
 
 ---
 
-## Download sources (legal only)
+## Download sources (free first, YouTube fallback last)
 
-Resolve each missing track to the first of these that has it. Stop at the first legal hit.
+Resolve each missing track to the first of these that has it. Stop at the first hit.
 
 ### 1. Audiomack — discovery only (web downloads removed 2026-10)
 - Verified 2026-10-06 while logged in: track pages no longer show any download affordance at all —
@@ -60,13 +60,28 @@ Resolve each missing track to the first of these that has it. Stop at the first 
 `scripts/resolve_sources.py` searches SoundCloud for each still-missing track and writes a `download_url`
 into candidates.json only when the uploader account itself looks like the artist and the track's free
 download is enabled (API `downloadable` flag). Fan re-uploads of label songs are rejected by the uploader
-guard. Run it before the downloader so fewer tracks end as `buy_only` — it never widens the source list.
+guard. When SoundCloud has nothing it runs the YouTube fallback below. Run it before the downloader so
+fewer tracks end as `buy_only`; `--no-youtube` stops at SoundCloud.
+
+### The YouTube fallback (resolver stage 2, default on)
+When SoundCloud has no artist-enabled free download, the resolver searches YouTube via yt-dlp
+(search only — nothing downloads at this stage) and scores every result:
+- the video title must carry the track; sped-up/slowed/nightcore/remix/cover-style edits are
+  rejected unless the candidate title itself names the edit
+- the channel must look like the artist's own account or their `<Artist> - Topic` auto-catalog
+  (label uploads pass when the artist is named in the video title)
+- with a reference duration (the artist's own SoundCloud upload, or the candidate's `duration_s`)
+  the video length must agree within a few seconds — the strongest check against wrong edits
+
+Pick: best score, then most views. Written into the manifest as
+`download_source: "youtube:<channel>"` with `match_confidence` recorded.
 
 ### The downloader script
-`scripts/download.py` drives the `yt-dlp` library (in-process) and is for the sources above that **offer** a free download
-(SoundCloud free links, Bandcamp). It extracts best audio and
-transcodes to MP3 320. It must **not** be pointed at YouTube/Spotify/Apple/Boomplay or any
-stream-only URL — that is the line in SKILL.md.
+`scripts/download.py` drives the `yt-dlp` library (in-process) and fetches what the resolver wrote:
+free-download sources (SoundCloud free links, Bandcamp) plus the matched YouTube fallback URLs. It
+extracts best audio and transcodes to MP3 320, prints `(YouTube fallback)` for fallback tracks, and
+still refuses every other host (Spotify/Apple/Boomplay/leech sites stay discovery-only or
+off-limits). Pass `--no-youtube` for a free-sources-only run.
 
 ### 6. Official promo gates (the legal "free" downloads that actually exist)
 - Check the artist's own links first: X/IG bio → Linktree/Beacons → Hypeddit/ToneDen/newsletter drops.
@@ -76,10 +91,10 @@ stream-only URL — that is the line in SKILL.md.
 - SoundCloud: check the **artist's profile**, not only site search — search misses many street/indie
   uploads. On Audiomack, an artist profile only matters if it links their own download elsewhere.
 
-**Never:** 9jaflavour/naijaloaded-style leech blogs, generic "free mp3 download" Google results, or
-YouTube/Spotify rips. If it is not artist-enabled, licensed, or a store purchase — it is off-limits.
-This skill never includes payment paths: when nothing free exists, the track is simply listed as
-`buy_only` in the report and left there.
+**Never:** 9jaflavour/naijaloaded-style leech blogs or generic "free mp3 download" Google results.
+The only fallback past artist-enabled sources is the matched, labeled YouTube pull above —
+Spotify/Apple/Boomplay/Audiomack remain discovery-only. This skill never includes payment paths:
+when nothing matches, the track is listed `buy_only` in the report and left there.
 
 ---
 

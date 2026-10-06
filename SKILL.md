@@ -1,13 +1,13 @@
 ---
 name: dj-search
-description: A crate-digging assistant for DJs. Finds what is trending in the last 7/14/30 days (Afrobeats, Amapiano, Nigerian/naija pop, Gen-Z TikTok sounds, or any genre you name), checks whether you already own each track on your PC and your Google Drive so you never re-download, pulls the ones you are missing from legal free sources (SoundCloud, Bandcamp, artist/label promo, your DJ pools) as clean or dirty MP3s, and hands you a ranked crate with set-placement and BPM/key notes. Use this whenever the user types /dj-search or asks to find trending songs, build a crate, update their music library, dig for new Afrobeats/Amapiano/naija tracks, find DJ-ready downloads, or check what new music they are missing.
+description: A crate-digging assistant for DJs. Finds what is trending in the last 7/14/30 days (Afrobeats, Amapiano, Nigerian/naija pop, Gen-Z TikTok sounds, or any genre you name), checks whether you already own each track on your PC and your Google Drive so you never re-download, downloads the ones you are missing — artist-enabled free sources first (SoundCloud, Bandcamp, artist/label promo, your DJ pools), then a matched YouTube audio fallback — as clean or dirty MP3s, and hands you a ranked crate with set-placement and BPM/key notes. Use this whenever the user types /dj-search or asks to find trending songs, build a crate, update their music library, dig for new Afrobeats/Amapiano/naija tracks, find DJ-ready downloads, or check what new music they are missing.
 ---
 
 # dj-search
 
 A crate-digging run for a working DJ. One command: find what is trending now, skip what you
-already have (on the PC **and** on Drive), download the rest from legal free sources, and give a
-DJ's opinion on how to play it.
+already have (on the PC **and** on Drive), download the rest (artist-enabled free sources first,
+then a matched YouTube audio fallback), and give a DJ's opinion on how to play it.
 
 Built for the Nigerian / Afrobeats / Amapiano / Gen-Z scene by default, but the genre is just an
 input — set it to anything.
@@ -43,10 +43,11 @@ relaunch or copy the browser profile. Pull from several charts and intersect, so
 
 Produce a candidate list: `id` (`cand-001`…), `artist`, `title`, `genre`, `why_trending` (which
 charts, rising/new), `release_date` (ISO `YYYY-MM-DD`), `bpm`/`key` when a source gives them,
-`sources`, and `variant` (`clean`/`dirty`/empty). Later steps fill in `download_status` (`missing` →
-`downloaded`/`promo`/`buy_only`/`failed`), `download_url`, `download_source` (set by the resolver,
-e.g. `soundcloud:<uploader>`), `local_path`, `recommendation`, `error`. Write it to
-`<save_path>/_dj-search/candidates.json`.
+`sources`, and `variant` (`clean`/`dirty`/empty). Add `duration_s` when a chart page shows it — the
+resolver uses it to length-check its YouTube fallback. Later steps fill in `download_status`
+(`missing` → `downloaded`/`promo`/`buy_only`/`failed`), `download_url`, `download_source` (set by the
+resolver: `soundcloud:<uploader>` or `youtube:<channel>`), `match_confidence`, `local_path`,
+`recommendation`, `error`. Write it to `<save_path>/_dj-search/candidates.json`.
 
 ### 3. Check what you already own — the whole PC first
 
@@ -82,50 +83,63 @@ In order of preference (details in `references/sources.md`):
 
 Merge PC + Drive into one `owned` set. Only genuinely-missing tracks go to step 5.
 
-### 5. Download the missing ones — legal sources only
+### 5. Download the missing ones — free sources first, YouTube fallback after
 
-For each missing track, resolve a **legal** download URL and fetch it. Check the artist's own
-profile (not just site search), and hunt official promo gates — artist Linktree/bios/social posts
-often carry legit Free Download links. Recipes: `references/sources.md`.
+For each missing track, resolve a download URL and fetch it, in this order:
+
+1. **Artist-enabled free sources** — SoundCloud Free Download, Bandcamp free / name-your-price,
+   official promo gates. Check the artist's own profile (not just site search) — artist
+   Linktree/bios/social posts often carry legit Free Download links. Recipes: `references/sources.md`.
+2. **YouTube audio fallback (default on, `--no-youtube` disables)** — for tracks with no free source,
+   the resolver searches YouTube via yt-dlp and matches the way sunnify-style downloaders do: the
+   video title must carry the track (speed/remix/cover edits are rejected unless the candidate names
+   them), the channel must look like the artist's own account or their `<Artist> - Topic` catalog,
+   and when a reference duration is known (the artist's own SoundCloud upload — even a stream-only
+   one — or the candidate's `duration_s`) the video length must agree within a few seconds. That
+   length check is what rejects wrong edits of the right song. Matches are labeled
+   `download_source: "youtube:<channel>"` in the manifest, `match_confidence` is recorded, and the
+   downloader prints `(YouTube fallback)` for each so the report stays honest about where files came
+   from. Tracks a previous run parked as `buy_only` are automatically reconsidered.
 
 **Absolute rule — no track ends unresolved (the streak rule: keep going until it's downloaded).**
 Every missing track must finish as exactly one of:
 
-- **downloaded** — fetched from an artist-enabled free source (best outcome)
+- **downloaded** — fetched from an artist-enabled free source, or via the matched YouTube fallback
+  (the manifest records which, in `download_source`)
 - **promo** — an official artist/label promo link was found; set `download_status: "promo"` and put
   the gate link in `download_url` (no file is fetched — the DJ completes the gate)
-- **buy_only** — no free, artist-enabled source exists anywhere; list it in the report with this
-  status and move on. This skill **never** pushes payments and never carries store links.
+- **buy_only** — neither a free/artist-enabled source nor a plausible YouTube match exists; list it
+  in the report with this status and move on. This skill **never** pushes payments and never carries
+  store links.
 
 Never silently drop a track. Keep looping **resolve → download → retry** until every track lands in
 one of those buckets: on reruns pass `--retry-failed` to `download.py` so previously failed tracks get
-another shot through every legal channel. `buy_only` is a resolved end state, not a miss — when no
-artist-enabled source exists, the loop has done everything it legitimately can. And it never widens
-the source list to piracy: **no 9jaflavour-style leech
-blogs, no "free mp3" sites from Google results, no YouTube/streaming rips.** Those distribute these
-same songs without a license — repo-ban and legal-risk territory, not a download strategy. If it
-isn't artist-enabled or licensed, the finish line is: listed as `buy_only` in the report. Nothing
-more. Summary:
+another shot. `buy_only` is a resolved end state, not a miss — it now means the free-source hunt and
+the YouTube match both came up empty. And it never widens the source list to leeching: **no
+9jaflavour-style blogs, no "free mp3" sites from Google results** — the only fallback beyond
+artist-enabled sources is the matched YouTube audio pull above (yt-dlp, title/channel/length-checked,
+labeled in the manifest). Spotify / Apple Music / Boomplay / Audiomack stay discovery-only. Summary:
 
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
-- `scripts/resolve_sources.py` auto-resolves download URLs first: it searches SoundCloud and writes a
-  `download_url` into candidates.json only when the uploader account itself looks like the artist and
-  the track's free download is enabled (the API's `downloadable` flag) — run it after the scan/Drive
-  steps so fewer tracks end as `buy_only`:
+- `scripts/resolve_sources.py` auto-resolves download URLs first (SoundCloud, then the YouTube
+  fallback), writing `download_url` + `download_source` into candidates.json — run it after the
+  scan/Drive steps:
   `python scripts/resolve_sources.py --candidates "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json"`
-- `scripts/download.py` drives the `yt-dlp` library in-process for sources that *offer* a free download (SoundCloud/Bandcamp
-  free links). It is **not** for streaming/paywalled rips — see the legal line. Run it as
+  (add `--no-youtube` for a free-sources-only run). It needs the `yt-dlp` package for the fallback;
+  without it, only the SoundCloud stage runs.
+- `scripts/download.py` drives the `yt-dlp` library in-process and fetches what the resolver wrote:
+  SoundCloud/Bandcamp free links plus the matched YouTube fallback URLs. Run it as
   `python scripts/download.py --manifest "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json" --outdir "<save_path>" --confirm-free-download`
-  (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
-  Its final report lists every track **downloaded** (with path) and everything **skipped** (owned /
-  buy_only / no source found) — relay both to the DJ.
+  (it refuses any other host, prints `(YouTube fallback)` per such track, and updates
+  `download_status`/`local_path` per track; `--no-youtube` skips fallback tracks). Its final report
+  lists every track **downloaded** (with path) and everything **skipped** — relay both to the DJ.
 - What the two scripts could not get, hunt by hand: SoundCloud/Bandcamp artist profiles and official
   promo gates. Confirm a real Download/Free affordance before using it (Audiomack has no web downloads
   anymore — only follow a download link the artist themselves posted). Files land in the browser's
   Downloads folder; then move+rename them into `<save_path>`.
 - Name every file `Artist - Title (Clean).mp3` / `(Dirty).mp3`, 320 kbps where the source allows,
   written straight into `<save_path>`.
-- If no legal free source exists: mark the track `buy_only` and list it in the final report. Never
+- If neither route finds anything: mark the track `buy_only` and list it in the final report. Never
   fail the whole run over one track, and never leave one unresolved either.
 
 ### 6. Recommend like a DJ, not a database
@@ -148,7 +162,9 @@ Close with a short, opinionated read — this is the part a DJ actually wants:
 
 ## Never
 
-- or piracy sites. Discovery only.
+- Never download from leech blogs or "free mp3" sites; the only fallback past artist-enabled free
+  sources is the matched, labeled YouTube pull in step 5. Spotify / Apple Music / Boomplay / Audiomack:
+  discovery only.
 - Never enter the DJ's passwords or solve captchas for them — pause and ask them to log in.
 - Never close, kill, relaunch or copy the user's Chrome — work in the browser that is already open.
 - Never overwrite an existing file in the save path without renaming (` (2)`); never delete library files.

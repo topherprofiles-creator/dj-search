@@ -11,6 +11,9 @@ plus a 3-entry candidates.json, then asserts:
   - cand-002 is owned via the Drive listing only
   - cand-003 is missing
   - write_crate produces the CSV + M3U8; the playlist holds the local file only
+  - download.source_kind() classifies legal/youtube/other URLs, and
+    resolve_sources.youtube_match_score() accepts artist/topic/duration-consistent
+    results while rejecting wrong edits and unverifiable strangers (no network)
 
 Run:  python tests/smoke_test.py
 """
@@ -102,7 +105,47 @@ def main() -> int:
         assert "Lagos Night Drive" in m3u, m3u
         assert "Cloud Crate" not in m3u, "cloud-only track must not claim a local path"
 
-        print("PASS - scan de-dup (pc / drive / missing) and crate outputs verified")
+        # --- script guards + YouTube matching (offline, no network) -----------
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import download as dl          # noqa: E402
+        import resolve_sources as rs   # noqa: E402
+
+        assert dl.source_kind("https://soundcloud.com/a/b") == "legal"
+        assert dl.source_kind("https://artist.bandcamp.com/track/x") == "legal"
+        assert dl.source_kind("https://www.youtube.com/watch?v=x") == "youtube"
+        assert dl.source_kind("https://youtu.be/x") == "youtube"
+        assert dl.source_kind("https://open.spotify.com/track/x") == ""
+        assert dl.source_kind("https://naijaloaded.com.ng/x") == ""
+
+        def ytv(title, channel, duration, views=0, live=None):
+            return {"title": title, "channel": channel, "duration": duration,
+                    "view_count": views, "live_status": live,
+                    "webpage_url": "https://www.youtube.com/watch?v=test"}
+
+        artist, title = "Rema", "Calm Down"
+        topic = ytv("Rema - Calm Down", "Rema - Topic", 237)
+        own = ytv("Rema - Calm Down (Official Music Video)", "Rema", 237)
+        label = ytv("Rema - Calm Down (Official Video)", "Mavin Records", 237, 5_000_000)
+        slowed = ytv("Rema - Calm Down (Sped Up)", "Rema", 190)
+        long_edit = ytv("Rema - Calm Down", "Rema", 301)
+        live = ytv("Rema - Calm Down (Live)", "Rema", 237, live="is_live")
+        stranger = ytv("Calm Down (Official Audio)", "Afrobeats Central", 237)
+
+        s_topic, c_topic = rs.youtube_match_score(artist, title, topic, 237)
+        s_own, _ = rs.youtube_match_score(artist, title, own, 237)
+        assert s_topic > s_own > 0 and c_topic == "high"
+        s_label, c_label = rs.youtube_match_score(artist, title, label, 237)
+        assert s_label > 0 and c_label == "high"       # duration vouches for label uploads
+        s_lab2, c_lab2 = rs.youtube_match_score(artist, title, label, None)
+        assert s_lab2 > 0 and c_lab2 == "medium"       # no reference: artist named in title
+        assert rs.youtube_match_score(artist, title, slowed, 237) == (0, "")
+        assert rs.youtube_match_score(artist, title, long_edit, 237) == (0, "")
+        assert rs.youtube_match_score(artist, title, live, 237) == (0, "")
+        assert rs.youtube_match_score(artist, title, stranger, None) == (0, "")
+        assert rs.youtube_match_score(artist, title, stranger, 237)[0] > 0  # duration-only OK
+
+        print("PASS - scan de-dup (pc / drive / missing), crate outputs, "
+              "download allowlist and YouTube match scoring verified")
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)

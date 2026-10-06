@@ -2,7 +2,7 @@
 
 **A crate-digging skill for [Claude Code](https://claude.com/claude-code) — built for Afrobeats, Amapiano, Nigerian and Gen-Z DJs, works for any genre.**
 
-One run: find what's trending right now, skip what you already own (PC **and** Google Drive), download the rest from legal free sources, and get a ranked crate with BPM/key notes and set-placement recommendations.
+One run: find what's trending right now, skip what you already own (PC **and** Google Drive), download the rest (artist-enabled free sources first, matched YouTube fallback after), and get a ranked crate with BPM/key notes and set-placement recommendations.
 
 ## What it does
 
@@ -12,19 +12,26 @@ Type `/dj-search` in Claude Code and the skill:
 2. **Discovers** what's moving — reads TurnTable Charts, Apple Music NG, Spotify NG + Viral, Audiomack, Boomplay, Shazam NG and TikTok trending sounds in your live Chrome, intersects the charts, and keeps only entries moving inside your window.
 3. **Scans your PC** — `scripts/scan_library.py` walks your **entire PC and every plugged-in flash/removable drive** (`--all-drives`; system folders are pruned automatically), reads ID3v2/ID3v1, MP4/M4A atoms and FLAC tags offline (zero dependencies), and fuzzy-matches every candidate against what's there.
 4. **Checks Google Drive** — mounted Drive letter, an `rclone` listing, or a browser search — so you never re-download what's already in the cloud.
-5. **Downloads what's missing** — auto-resolves artist-enabled SoundCloud free downloads (`resolve_sources.py`), then fetches from SoundCloud (Free Download), Bandcamp, artist/label promo gates, or your own DJ pool; anything with no legal free source ends as `buy_only`, never silently dropped.
+5. **Downloads what's missing** — `resolve_sources.py` auto-resolves artist-enabled SoundCloud free downloads, then falls back to a matched YouTube audio pull (yt-dlp search; title + artist/`Topic` channel + duration check); `download.py` fetches, transcodes to MP3 320 and labels every track with its `download_source`. Only when both routes come up empty does a track end as `buy_only` — never silently dropped.
 6. **Recommends like a DJ** — crate picks, rising vs. peaked, BPM/key groupings, harmonic-pair flags.
 7. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / Engine.
 
-## The legal line
+## Where downloads come from
 
-This repo only downloads tracks that are offered for **free download** or that **you are licensed for**:
+Downloads run in this order, and every file is labeled with its origin (`download_source` in candidates.json):
 
-- *(Audiomack is **discovery only** since Oct 2026 — its web player no longer offers per-song downloads; downloads moved to the app / Plus)*
-- SoundCloud "Free Download" / link-gated promos
-- Bandcamp free or name-your-price
-- Official artist/label promo gates (Linktree, Hypeddit, ToneDen)
-- Your own paid pool subscriptions (BPM Supreme, DJcity, ZIPDJ, …)
+1. **Artist-enabled free sources** — SoundCloud "Free Download" / link-gated promos, Bandcamp free
+   or name-your-price, official artist/label promo gates (Linktree, Hypeddit, ToneDen), your own paid
+   pool subscriptions (BPM Supreme, DJcity, ZIPDJ, …). *(Audiomack is **discovery only** since Oct
+   2026 — its web player no longer offers per-song downloads; downloads moved to the app / Plus.)*
+2. **Matched YouTube fallback** (default; `--no-youtube` turns it off) — `resolve_sources.py`
+   searches YouTube via yt-dlp and accepts a video only when the title carries the track, the channel
+   looks like the artist's own account / `<Artist> - Topic`, and — when a reference duration is
+   known — the length agrees within a few seconds, which rejects sped-up / slowed / remix edits.
+   These show as `youtube:<channel>` in the manifest, never silently mixed in.
+
+Still off-limits: 9jaflavour/naijaloaded-style leech blogs and "free mp3" Google results — and this
+skill never includes payment paths; when nothing matches, the track is listed `buy_only` and left there.
 
 
 ## Requirements
@@ -32,9 +39,9 @@ This repo only downloads tracks that are offered for **free download** or that *
 | | |
 |---|---|
 | [Claude Code](https://claude.com/claude-code) | hosts the skill |
-| Python 3.9+ | scripts are stdlib-only — no pip installs |
+| Python 3.9+ | scripts are stdlib-first — only `yt-dlp`/`ffmpeg` extend the download path |
 | A browser automation MCP (chrome-devtools recommended) | chart reading + downloads |
-| `yt-dlp` *(optional)* | `python -m pip install -U yt-dlp` — automated downloads (used as an in-process library) |
+| `yt-dlp` *(recommended)* | `python -m pip install -U yt-dlp` — automated downloads + the YouTube fallback (used as an in-process library) |
 | `ffmpeg` *(optional)* | MP3 320 transcode for downloaded files |
 | `rclone` *(optional)* | offline Google Drive de-dup |
 
@@ -71,7 +78,7 @@ dj-search/
 ├─ SKILL.md                     the skill itself (Claude Code entry point)
 ├─ scripts/
 │  ├─ scan_library.py           offline tag reader + fuzzy de-dup (zero deps)
-│  ├─ resolve_sources.py        artist-enabled SoundCloud download resolver (zero deps)
+│  ├─ resolve_sources.py        SoundCloud resolver + YouTube fallback (stdlib; yt-dlp for the fallback)
 │  ├─ download.py               legal-source downloader (yt-dlp library, allowlisted)
 │  └─ write_crate.py            ranked CSV + M3U8 writer
 ├─ references/
@@ -113,7 +120,7 @@ Builds a synthetic library (fake ID3 tags, a filename-only file, a Drive-only tr
 
 ## Contributing
 
-PRs welcome — keep `scripts/` stdlib-only and run `python tests/smoke_test.py` before submitting.
+PRs welcome — keep `scripts/` stdlib-first (`yt-dlp` stays an optional import) and run `python tests/smoke_test.py` before submitting.
 
 ## License
 
