@@ -71,13 +71,10 @@ stream-only URL — that is the line in SKILL.md.
 - SoundCloud and Audiomack: check the **artist's profile**, not only site search — search misses
   many street/indie uploads.
 
-### 7. Buy links (when nothing free exists anywhere)
-- `scripts/find_buy_links.py` fills the exact Apple Music store URL per track (public iTunes Search
-  API, `country=ng`).
-- Also point the DJ at Boomplay, or their pools (BPM Supreme/DJcity rarely carry NG street).
-
 **Never:** 9jaflavour/naijaloaded-style leech blogs, generic "free mp3 download" Google results, or
 YouTube/Spotify rips. If it is not artist-enabled, licensed, or a store purchase — it is off-limits.
+This skill never includes payment paths: when nothing free exists, the track is simply listed as
+`buy_only` in the report and left there.
 
 ---
 

@@ -114,12 +114,14 @@ often carry legit Free Download links. Recipes: `references/sources.md`.
 
 - **downloaded** — fetched from an artist-enabled free source (best outcome)
 - **promo** — an official artist/label promo link was found; the DJ completes the gate
-- **buy_only** — no free source exists, but an exact store link is filled (one-click buy)
+- **buy_only** — no free, artist-enabled source exists anywhere; list it in the report with this
+  status and move on. This skill **never** pushes payments and never carries store links.
 
 Never silently drop a track, and never widen the source list to piracy: **no 9jaflavour-style leech
 blogs, no "free mp3" sites from Google results, no YouTube/streaming rips.** Those distribute these
 same songs without a license — repo-ban and legal-risk territory, not a download strategy. If it
-isn't artist-enabled or licensed, the finish line is the buy link. Summary:
+isn't artist-enabled or licensed, the finish line is: listed as `buy_only` in the report. Nothing
+more. Summary:
 
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
 - Audiomack/SoundCloud/Bandcamp: open the track page, confirm a real Download/Free affordance, use it.
@@ -130,14 +132,10 @@ isn't artist-enabled or licensed, the finish line is the buy link. Summary:
   (it refuses any URL outside its allowlist and updates `download_status`/`local_path` per track).
   Its final report lists every track **downloaded** (with path) and everything **skipped** (owned /
   buy_only / no source found) — relay both to the DJ.
-- `scripts/find_buy_links.py` fills a one-click store link for every track that ends `buy_only`, so
-  the DJ has a purchase path for everything not legally downloadable.
 - Name every file `Artist - Title (Clean).mp3` / `(Dirty).mp3`, 320 kbps where the source allows,
   written straight into `<save_path>`.
-- If no legal free source exists: run `scripts/find_buy_links.py --candidates
-  "<save_path>/_dj-search/candidates.json"` — it fills the exact Apple Music/store link per track
-  (public iTunes Search API, no key) — set `buy_only`, and move on. Never fail the whole run over
-  one track, and never leave one unresolved either.
+- If no legal free source exists: mark the track `buy_only` and list it in the final report. Never
+  fail the whole run over one track, and never leave one unresolved either.
 
 ### 6. Recommend like a DJ, not a database
 
