@@ -4,7 +4,7 @@
 Fetches what the resolver wrote: artist-enabled free sources first - SoundCloud
 (Free Download enabled), Bandcamp (free / name-your-price) - plus, when the
 resolver matched one, a YouTube fallback URL (download_source "youtube:<channel>";
-matching rules in resolve_sources.py and SKILL.md step 5). Every other host is
+matching rules in resolve_sources.py and SKILL.md step 4). Every other host is
 still refused - Spotify, Apple Music, Boomplay, Audiomack, leech sites. The
 allowlist below is enforced per URL; --no-youtube switches back to
 legal-sources-only.
@@ -19,7 +19,7 @@ interactive runs show a live download percentage on stderr.
 Requirements: yt-dlp installed for this interpreter
 (`python -m pip install -U yt-dlp`); ffmpeg on PATH for the MP3 320 transcode.
 
-Manifest mode (SKILL.md step 5) - downloads every candidate that is still
+Manifest mode (SKILL.md step 4) - downloads every candidate that is still
 missing and has a download_url, updating the manifest in place:
 
   python scripts/download.py --manifest "<save>/_dj-search/candidates.json" \
@@ -207,7 +207,7 @@ def main(argv=None) -> int:
     ap.add_argument("--jobs", type=int, default=6,
                     help="parallel downloads (default 6; 1 = serial)")
     ap.add_argument("--confirm-free-download", action="store_true",
-                    help="confirm each source offers a free/licensed download (SKILL.md step 5)")
+                    help="confirm each source offers a free/licensed download (SKILL.md step 4)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--retry-failed", action="store_true",
                     help="re-attempt candidates previously marked failed (no-track-left-behind loop)")
@@ -219,7 +219,7 @@ def main(argv=None) -> int:
         raise SystemExit(
             "Refusing to download without --confirm-free-download.\n"
             "Confirm the sources first - artist-enabled free downloads, or the\n"
-            "matched YouTube fallback the resolver wrote (SKILL.md step 5).")
+            "matched YouTube fallback the resolver wrote (SKILL.md step 4).")
 
     outdir = Path(args.outdir).resolve()
     outdir.mkdir(parents=True, exist_ok=True)

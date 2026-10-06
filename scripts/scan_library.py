@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """scan_library.py - offline audio-library scanner + fuzzy de-dup for dj-search.
 
-Walks the DJ's music folders and (optionally) a Google Drive mount or an
-`rclone lsf` listing, reads what tags it can with zero third-party packages
+Walks the DJ's music folders (and every drive with `--all-drives`) or an
+offline path listing, reads what tags it can with zero third-party packages
 (ID3v2/ID3v1 for MP3, MP4/M4A atoms, FLAC Vorbis comments, filename fallback),
 and fuzzy-matches every entry in candidates.json so nothing already owned is
 downloaded again.
 
-Called by SKILL.md step 3 (PC scan) and step 4 (Drive de-dup). Read-only:
+Called by SKILL.md step 3 (the PC scan). Read-only:
 it never writes to, moves, renames or deletes any audio file.
 
   python scripts/scan_library.py \
@@ -15,9 +15,9 @@ it never writes to, moves, renames or deletes any audio file.
       --roots "C:/DJ/Crates" "C:/Users/USER/Music" \
       --out "C:/DJ/Crates/_dj-search/have_pc.json"
 
-  rclone lsf gdrive: --recursive --include "*.mp3" > drive.txt
+  # or match against an offline path listing (--drive-listing, one path per line)
   python scripts/scan_library.py --candidates candidates.json \
-      --drive-listing drive.txt --out have_pc.json
+      --drive-listing listing.txt --out have_pc.json
 
 Exit code is 0 even when nothing matches; non-zero only on bad input.
 """

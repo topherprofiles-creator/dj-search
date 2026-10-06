@@ -113,18 +113,3 @@ off-limits). Pass `--no-youtube` for a free-sources-only run.
 The only fallback past artist-enabled sources is the matched, labeled YouTube pull above —
 Spotify/Apple/Boomplay/Audiomack remain discovery-only. This skill never includes payment paths:
 when nothing matches, the track is listed `buy_only` in the report and left there.
-
----
-
-## Google Drive de-dup
-
-Order of preference:
-
-1. **Mounted Drive (Google Drive for Desktop)** — check for a mounted letter: in PowerShell
-   `Get-PSDrive -PSProvider FileSystem`. If you see e.g. `G:` labelled Google Drive, pass it as an
-   extra `--roots` to `scan_library.py`. Done — same offline fuzzy match as the PC.
-2. **rclone** — if `rclone listremotes` shows a Drive remote:
-   `rclone lsf <remote>: --recursive --include "*.{mp3,wav,flac,m4a,aac}" > drive.txt`, then
-   `scan_library.py --drive-listing drive.txt`.
-3. **Browser** — only for tracks still missing after PC+mount. Open `drive.google.com`, search the
-   title, eyeball matches. Slow and manual; last resort.

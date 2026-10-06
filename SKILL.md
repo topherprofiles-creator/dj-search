@@ -1,13 +1,14 @@
 ---
 name: dj-search
-description: A crate-digging assistant for DJs. Finds what is trending in the last 7/14/30 days (Afrobeats, Amapiano, Nigerian/naija pop, Gen-Z TikTok sounds, or any genre you name), checks whether you already own each track on your PC and your Google Drive so you never re-download, downloads the ones you are missing — artist-enabled free sources first (SoundCloud, Bandcamp, artist/label promo, your DJ pools), then a matched YouTube audio fallback — as clean or dirty MP3s, and hands you a ranked crate with set-placement and BPM/key notes. Use this whenever the user types /dj-search or asks to find trending songs, build a crate, update their music library, dig for new Afrobeats/Amapiano/naija tracks, find DJ-ready downloads, or check what new music they are missing.
+description: A crate-digging assistant for DJs. Finds what is trending in the last 7/14/30 days (Afrobeats, Amapiano, Nigerian/naija pop, Gen-Z TikTok sounds, or any genre you name), checks whether you already own each track on your PC so you never re-download, downloads the ones you are missing — artist-enabled free sources first (SoundCloud, Bandcamp, artist/label promo, your DJ pools), then a matched YouTube audio fallback — as clean or dirty MP3s, and hands you a ranked crate with set-placement and BPM/key notes. Use this whenever the user types /dj-search or asks to find trending songs, build a crate, update their music library, dig for new Afrobeats/Amapiano/naija tracks, find DJ-ready downloads, or check what new music they are missing.
 ---
 
 # dj-search
 
 A crate-digging run for a working DJ. One command: find what is trending now, skip what you
-already have (on the PC **and** on Drive), download the rest (artist-enabled free sources first,
-then a matched YouTube audio fallback), and give a DJ's opinion on how to play it.
+already have (the whole PC and every plugged-in flash drive), download the rest (artist-enabled
+free sources first, then a matched YouTube audio fallback), and give a DJ's opinion on how to play
+it.
 
 Built for the Nigerian / Afrobeats / Amapiano / Gen-Z scene by default, but the genre is just an
 input — set it to anything.
@@ -69,21 +70,7 @@ and FLAC tags (filename fallback) and normalises names (drops
 candidate `owned` / `missing` with the matched file path and a confidence score. Treat <0.82 as a
 soft match — show it, let the DJ decide, do not silently skip.
 
-### 4. Check Google Drive — so you don't re-download what's already in the cloud
-
-In order of preference (details in `references/sources.md`):
-
-1. **Google Drive for Desktop mounted drive** — if a Drive letter is mounted (often `G:`), just add
-   it as another `--roots` entry in step 3's command. Fastest and most reliable.
-2. **rclone** — if the DJ has an `rclone` remote for Drive, list it and match offline:
-   `rclone lsf gdrive: --recursive --include "*.{mp3,wav,flac,m4a,aac}"` → feed to the scanner's
-   `--drive-listing` flag.
-3. **Browser** — otherwise open `drive.google.com`, search each missing track title, and read the
-   results. Slower; use only for the ones still missing after the PC scan.
-
-Merge PC + Drive into one `owned` set. Only genuinely-missing tracks go to step 5.
-
-### 5. Download the missing ones — free sources, YouTube, then the browser lookup
+### 4. Download the missing ones — free sources, YouTube, then the browser lookup
 
 For each missing track, resolve a download URL and fetch it, in this order:
 
@@ -138,7 +125,7 @@ discovery-only. Summary:
 - Prefer the **clean/radio** version when the DJ chose clean and one exists; else the explicit edit.
 - `scripts/resolve_sources.py` auto-resolves download URLs first (SoundCloud, then the YouTube
   fallback), writing `download_url` + `download_source` into candidates.json — run it after the
-  scan/Drive steps:
+  scan step:
   `python scripts/resolve_sources.py --candidates "<save_path>/_dj-search/candidates.json" --have "<save_path>/_dj-search/have_pc.json"`
   (add `--no-youtube` for a free-sources-only run). It needs the `yt-dlp` package for the fallback;
   without it, only the SoundCloud stage runs. Lookups run in parallel (`--jobs N`, default 6).
@@ -162,7 +149,7 @@ discovery-only. Summary:
 - If neither route finds anything: mark the track `buy_only` and list it in the final report. Never
   fail the whole run over one track, and never leave one unresolved either.
 
-### 6. Recommend like a DJ, not a database
+### 5. Recommend like a DJ, not a database
 
 Close with a short, opinionated read — this is the part a DJ actually wants:
 
@@ -172,18 +159,18 @@ Close with a short, opinionated read — this is the part a DJ actually wants:
   saturated on every dancefloor.
 - Keep it real and specific. No filler, no hype copy.
 
-### 7. Save the crate + report
+### 6. Save the crate + report
 
 - Write `scripts/write_crate.py` output: `<save_path>/_dj-search/crate_<window>d_<date>.csv` and `.m3u8`
   (the .m3u8 holds every track with a real local file — downloaded here or already on the PC —
   import-ready into Serato/rekordbox/Engine).
-- Print a compact table: downloaded / already-owned (PC vs Drive) / buy-only / failed, plus the
+- Print a compact table: downloaded / already-owned (PC) / buy-only / failed, plus the
   recommendations. Then stop.
 
 ## Never
 
 - Never download from leech blogs or "free mp3" sites; the only fallback past artist-enabled free
-  sources is the matched, labeled YouTube pull in step 5. Spotify / Apple Music / Boomplay / Audiomack:
+  sources is the matched, labeled YouTube pull in step 4. Spotify / Apple Music / Boomplay / Audiomack:
   discovery only.
 - Never enter the DJ's passwords or solve captchas for them — pause and ask them to log in.
 - Never close, kill, relaunch or copy the user's Chrome — work in the browser that is already open.

@@ -2,7 +2,7 @@
 
 **A crate-digging skill for [Claude Code](https://claude.com/claude-code) — built for Afrobeats, Amapiano, Nigerian and Gen-Z DJs, works for any genre.**
 
-One run: find what's trending right now, skip what you already own (PC **and** Google Drive), download the rest (artist-enabled free sources first, matched YouTube fallback after), and get a ranked crate with BPM/key notes and set-placement recommendations.
+One run: find what's trending right now, skip what you already own (the whole PC and every plugged-in flash drive), download the rest (artist-enabled free sources first, matched YouTube fallback after), and get a ranked crate with BPM/key notes and set-placement recommendations.
 
 ## What it does
 
@@ -11,10 +11,9 @@ Type `/dj-search` in Claude Code and the skill:
 1. **Stops and asks first** — save path, window (7 / 14 / 30 days), and genre (or *general*) — nothing runs until you answer; count and clean/dirty ride along with sensible defaults.
 2. **Discovers** what's moving — reads TurnTable Charts, Apple Music NG, Spotify NG + Viral, Audiomack, Boomplay, Shazam NG and TikTok trending sounds in your live Chrome, intersects the charts, and keeps only entries moving inside your window.
 3. **Scans your PC** — `scripts/scan_library.py` walks your **entire PC and every plugged-in flash/removable drive** (`--all-drives`; system folders are pruned automatically), reads ID3v2/ID3v1, MP4/M4A atoms and FLAC tags offline (zero dependencies), and fuzzy-matches every candidate against what's there.
-4. **Checks Google Drive** — mounted Drive letter, an `rclone` listing, or a browser search — so you never re-download what's already in the cloud.
-5. **Downloads what's missing** — `resolve_sources.py` auto-resolves artist-enabled SoundCloud free downloads, then falls back to a matched YouTube audio pull (yt-dlp search; title + artist/`Topic` channel + duration check); `download.py` fetches, transcodes to MP3 320 and labels every track with its `download_source`. Tracks both stages miss get a browser lookup: the agent searches YouTube in your already-open Chrome, verifies the video by channel + length, records it with `--set-url`, and the same downloader fetches it. Only when all three routes come up empty does a track end as `buy_only` — never silently dropped.
-6. **Recommends like a DJ** — crate picks, rising vs. peaked, BPM/key groupings, harmonic-pair flags.
-7. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / Engine.
+4. **Downloads what's missing** — `resolve_sources.py` auto-resolves artist-enabled SoundCloud free downloads, then falls back to a matched YouTube audio pull (yt-dlp search; title + artist/`Topic` channel + duration check); `download.py` fetches, transcodes to MP3 320 and labels every track with its `download_source`. Tracks both stages miss get a browser lookup: the agent searches YouTube in your already-open Chrome, verifies the video by channel + length, records it with `--set-url`, and the same downloader fetches it. Only when all three routes come up empty does a track end as `buy_only` — never silently dropped.
+5. **Recommends like a DJ** — crate picks, rising vs. peaked, BPM/key groupings, harmonic-pair flags.
+6. **Writes the crate** — `crate_<window>d_<date>.csv` + `.m3u8`, import-ready for Serato / rekordbox / Engine.
 
 ## Where downloads come from
 
@@ -48,7 +47,6 @@ skill never includes payment paths; when nothing matches, the track is listed `b
 | A browser automation MCP (chrome-devtools recommended) | chart reading + downloads |
 | `yt-dlp` *(recommended)* | `python -m pip install -U yt-dlp` — automated downloads + the YouTube fallback (used as an in-process library) |
 | `ffmpeg` *(optional)* | MP3 320 transcode for downloaded files |
-| `rclone` *(optional)* | offline Google Drive de-dup |
 
 ## Install
 
@@ -69,12 +67,6 @@ Then in Claude Code:
 ```
 
 It asks for the window and save path, then does the rest.
-
-## Google Drive de-dup (pick one)
-
-1. **Mounted drive (best)** — with Google Drive for Desktop running, pass the mount (`G:\My Drive`, etc.) as an extra `--roots` to the scanner.
-2. **rclone** — `rclone lsf gdrive: --recursive --include "*.mp3" > drive.txt`, then scan with `--drive-listing drive.txt`.
-3. **Browser** — last resort, only for tracks still missing after 1 and 2.
 
 ## Repo layout
 
@@ -101,7 +93,7 @@ Inside your save path you get the MP3s (`Artist - Title (Clean).mp3`) plus:
 ```
 <save>/_dj-search/
 ├─ candidates.json             what's trending + per-track status
-├─ have_pc.json                owned / missing per track (PC + Drive)
+├─ have_pc.json                owned / missing per track (PC)
 ├─ crate_7d_2026-10-06.csv
 └─ crate_7d_2026-10-06.m3u8
 ```
@@ -112,7 +104,7 @@ Inside your save path you get the MP3s (`Artist - Title (Clean).mp3`) plus:
 python tests/smoke_test.py
 ```
 
-Builds a synthetic library (fake ID3 tags, a filename-only file, a Drive-only track) in a temp dir and asserts the scanner and crate writer behave. No network, no audio decoding.
+Builds a synthetic library (fake ID3 tags, a filename-only file, an offline-listing match) in a temp dir and asserts the scanner and crate writer behave. No network, no audio decoding.
 
 ## Troubleshooting
 
@@ -120,7 +112,6 @@ Builds a synthetic library (fake ID3 tags, a filename-only file, a Drive-only tr
 - **ffmpeg missing / no MP3 out** — install ffmpeg and make sure it's on PATH.
 - **SoundCloud asks for a login** — the skill pauses and asks *you* to log in; it never enters credentials. For yt-dlp you can pass `--browser chrome` (close Chrome first — its cookie database is locked while running).
 - **Audiomack has no download button** — expected since Oct 2026: web downloads were removed (app / Plus only) and the old yt-dlp endpoint is dead, so the skill treats Audiomack as discovery-only.
-- **Drive letter missing** — Google Drive for Desktop may mount under a different letter; check `Get-PSDrive` (Windows) or the Finder sidebar (macOS), or use the rclone route.
 - **The whole-PC scan takes a while on the first run** — every audio file on every drive is tag-read once (system folders are skipped); matching itself is indexed and fast. Narrow it with `--roots <folder>` if you want it quicker.
 - **Big crate runs (50–100 tracks)** — `resolve_sources.py` and `download.py` work in parallel (`--jobs N`, default 6; 1 = serial) and retry transient YouTube 403s automatically. A 100-track crate is roughly a 15-minute job; a few tracks may still need one `--retry-failed` pass.
 
