@@ -12,31 +12,6 @@ DJ's opinion on how to play it.
 Built for the Nigerian / Afrobeats / Amapiano / Gen-Z scene by default, but the genre is just an
 input — set it to anything.
 
-## Legal line (do not cross it — it keeps this repo alive and keeps the DJ safe)
-
-This skill downloads **only** from sources that offer the track for free download, or that the DJ
-is licensed for:
-
-- **Audiomack** — **discovery only since Oct 2026**: the web player no longer offers per-song downloads
-  at all (downloads moved to the mobile app / Plus) and the endpoint yt-dlp used is dead. Use it to find
-  tracks; get the file from the artist's own links (free SoundCloud download, promo gate) or a pool.
-- **SoundCloud** — tracks with a "Free Download" / "Buy" → free link.
-- **Bandcamp** — free or name-your-price downloads.
-- **Official artist/label promo** — Linktree/Hypeddit/ToneDen gates, newsletter drops.
-- **The DJ's own pool subscriptions** — BPM Supreme, DJcity, ZIPDJ, DigitalDJPool, Beatport (paid, logged in).
-
-Do **not** rip audio from YouTube, Spotify, Apple Music or Boomplay, and do **not** touch
-piracy/warez MP3 sites. Those are used for *discovery only* (seeing what charts), never as a
-download source. When the only place a track exists is streaming/paywalled, say so and point the
-DJ at where to buy or pull it — do not download it. If the user explicitly asks to rip a
-streaming-only track, decline that track and offer the legal alternative; keep doing the rest.
-
-Leech/aggregator sites are on the wrong side of that same line: **never** use 9jaflavour-style
-"free MP3" blogs or Google-result download sites, even when a track is unfindable elsewhere. They
-redistribute these exact songs without a license — using them risks the repo and the DJ, not just
-the site.
-
-## The run, in order
 
 ### 1. STOP — ask first (strict rule, no exceptions)
 
@@ -169,7 +144,7 @@ Close with a short, opinionated read — this is the part a DJ actually wants:
 
 ## Never
 
-- Never download from YouTube/Spotify/Apple/Boomplay or piracy sites. Discovery only.
+- or piracy sites. Discovery only.
 - Never enter the DJ's passwords or solve captchas for them — pause and ask them to log in.
 - Never kill, relaunch or copy Chrome (`use-live-chrome`).
 - Never overwrite an existing file in the save path without renaming (` (2)`); never delete library files.
